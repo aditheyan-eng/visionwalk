@@ -1,0 +1,145 @@
+/* --- MAIN CONTAINER --- */
+.vision-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  overflow: hidden;
+  font-family: 'Arial', sans-serif;
+}
+
+/* --- CAMERA & CANVAS OVERLAY --- */
+.camera-feed, .overlay-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Perfectly scales for both laptop landscape & phone portrait */
+  z-index: 1;
+}
+
+.overlay-canvas {
+  z-index: 10;
+}
+
+/* --- START SCREEN --- */
+.start-overlay {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15, 23, 42, 0.95);
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+}
+
+.start-content h1 { color: #06b6d4; font-size: clamp(2.5rem, 5vw, 4rem); margin-bottom: 10px; letter-spacing: 2px; text-align: center; }
+.start-content p { color: white; font-size: clamp(1.2rem, 3vw, 2rem); animation: pulse 1.5s infinite; text-align: center; }
+
+@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+/* --- POCKET MODE OVERLAY --- */
+.pocket-mode-overlay {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  pointer-events: auto; /* BLOCKS ALL CLICKS TO THE UI BELOW IT */
+  color: white;
+  text-align: center;
+  padding: 20px;
+}
+
+.pocket-mode-overlay h2 { color: #facc15; font-size: clamp(2rem, 4vw, 3rem); letter-spacing: 2px; }
+.pocket-mode-overlay p { font-size: clamp(1rem, 2vw, 1.5rem); color: #94a3b8; margin-top: 10px; }
+.pocket-hint span { color: #06b6d4; font-weight: bold; }
+
+/* --- HUD INTERFACE --- */
+.hud-interface {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 20;
+  pointer-events: none; /* Let clicks pass through empty space */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Top Bar - Responsive Padding */
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  padding: clamp(10px, 3vw, 30px);
+  pointer-events: auto;
+}
+
+.filter-select {
+  background: rgba(15, 23, 42, 0.85);
+  color: #06b6d4;
+  border: 2px solid #06b6d4;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
+  font-weight: bold;
+  outline: none;
+}
+
+.exit-btn {
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  border: none;
+  padding: 10px 25px;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
+  cursor: pointer;
+}
+
+/* Voice Transcript */
+.voice-transcript {
+  text-align: center;
+  color: #e2e8f0;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 10px 20px;
+  margin: 0 auto;
+  border-radius: 30px;
+  font-style: italic;
+  font-size: clamp(0.8rem, 2vw, 1.1rem);
+  max-width: 80%;
+}
+
+/* Bottom Alert Box */
+.alert-box {
+  margin: clamp(10px, 3vw, 30px);
+  padding: clamp(15px, 3vw, 25px);
+  border-radius: 15px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.alert-box h2 { margin: 0 0 5px 0; font-size: clamp(1.5rem, 4vw, 2.5rem); }
+.alert-box h3 { margin: 0; font-size: clamp(1.2rem, 3vw, 2rem); }
+
+.alert-safe { background: rgba(6, 182, 212, 0.25); border: 2px solid #06b6d4; color: #a5f3fc; }
+.alert-danger { background: rgba(239, 68, 68, 0.4); border: 2px solid #ef4444; color: #fca5a5; animation: flashWarning 0.8s infinite; }
+
+@keyframes flashWarning {
+  0% { background: rgba(239, 68, 68, 0.4); }
+  50% { background: rgba(239, 68, 68, 0.8); box-shadow: 0 0 20px rgba(239, 68, 68, 0.8); }
+  100% { background: rgba(239, 68, 68, 0.4); }
+}
+
+/* --- RESPONSIVE MEDIA QUERIES --- */
+/* For strictly mobile portrait layout adjustments */
+@media (max-width: 600px) {
+  .top-bar { align-items: center; }
+  .filter-select, .exit-btn { padding: 8px 12px; }
+  .alert-box { margin-bottom: 20px; }
+}
