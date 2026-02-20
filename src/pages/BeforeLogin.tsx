@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import * as Vosk from 'vosk-browser'; // Ensure capitalization matches your import style
+import * as Vosk from 'vosk-browser'; 
 import { useNavigate } from 'react-router-dom';
-import './Home.css'; // Reusing your main CSS
+import './Home.css'; 
 
 const BeforeLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -11,10 +11,10 @@ const BeforeLogin: React.FC = () => {
   
   // Refs for persistent state across renders
   const isPocketModeRef = useRef(false);
-  const modelRef = useRef<any>(null); // Using 'any' for Vosk model to avoid strict type issues
+  const modelRef = useRef<any>(null); 
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  // 1. BACKEND ALIGNMENT: Check if user is already logged in
+  // 1. Auto-redirect if user is already logged in
   useEffect(() => {
     const user = localStorage.getItem("user");
     if (user) {
@@ -27,15 +27,16 @@ const BeforeLogin: React.FC = () => {
   useEffect(() => { isPocketModeRef.current = isPocketMode; }, [isPocketMode]);
 
   useEffect(() => {
-    let wakeLock: WakeLockSentinel | null = null;
+    let wakeLock: any = null;
 
     async function loadModel() {
       try {
-        // Ensure this path matches exactly where you put the model in your 'public' folder
         const model = await Vosk.createModel('/models/vosk/model.tar.gz');
         modelRef.current = model;
-        setStatus("Voice Ready. Say 'Login'");
-        speak("Welcome to Vision Walk. Say Login to begin.");
+        setStatus("Voice Ready. Say 'Start'");
+        
+        // --- NEW STARTUP NOTIFICATION ---
+        speak("Welcome to Vision Walk. Tap on the center of the screen or say start, to begin.");
       } catch (e) { 
         console.error("Vosk Load Failed:", e);
         setStatus("Voice Model Failed to Load");
@@ -47,7 +48,7 @@ const BeforeLogin: React.FC = () => {
     const requestWakeLock = async () => {
         try {
           if ('wakeLock' in navigator && document.visibilityState === 'visible') {
-            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock = await (navigator as any).wakeLock.request('screen');
           }
         } catch (err) { console.log("Wake Lock skipped"); }
     };
@@ -92,16 +93,10 @@ const BeforeLogin: React.FC = () => {
         return; 
     }
 
-    // 2. BACKEND ALIGNMENT: "Start" checks auth status
+    // --- NEW DIRECT START LOGIC ---
     if (cmd.includes("start")) { 
-        const user = localStorage.getItem("user");
-        if (user) {
-            speak("Starting Vision Walk.");
-            navigate('/home'); 
-        } else {
-            speak("Please login first.");
-            navigate('/login');
-        }
+        speak("Starting Vision Walk.");
+        navigate('/vision'); // Goes directly to LiveVision now!
         return; 
     }
   };
@@ -126,7 +121,6 @@ const BeforeLogin: React.FC = () => {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
             const source = ctx.createMediaStreamSource(stream);
             
-            // Recognizer with specific grammar for better accuracy
             const grammar = '["login", "start", "pocket mode", "unlock", "exit", "[unk]"]';
             const recognizer = new modelRef.current.KaldiRecognizer(16000, grammar);
             
@@ -136,13 +130,12 @@ const BeforeLogin: React.FC = () => {
                 }
             });
             
-            // Audio Processor Node
             const node = ctx.createScriptProcessor(4096, 1, 1);
             node.onaudioprocess = (e) => {
                 try {
                     recognizer.acceptWaveform(e.inputBuffer);
-                } catch (err) {
-                    // Ignore minor buffer errors
+                } catch {
+                    // --- VERCEL TYPESCRIPT FIX: Removed 'err' variable ---
                 }
             };
             
@@ -174,7 +167,10 @@ const BeforeLogin: React.FC = () => {
         <button 
             className="logout-btn" 
             style={{borderColor:'#06b6d4', color:'#06b6d4', background:'rgba(6,182,212,0.1)'}} 
-            onClick={() => navigate('/login')}
+            onClick={() => {
+                speak("Opening login page.");
+                navigate('/login');
+            }}
         >
             Login
         </button>
@@ -185,6 +181,7 @@ const BeforeLogin: React.FC = () => {
         
         <div className="orb-container">
             {isListening && <div className="ripple"></div>}
+            {/* The orb acts as the center of the screen to tap! */}
             <button className={`orb-btn ${isListening ? 'listening' : ''}`} onClick={toggleListening}>
                 <div className="orb-text">
                    <span className="orb-icon">{isListening ? '🎙️' : '👆'}</span>

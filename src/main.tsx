@@ -29,9 +29,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route path="/signup" element={<Signup />} />
 
         {/* Protected Routes (User must be logged in to see these) */}
-        <Route path="/vision" element={
-          <ProtectedRoute><LiveVision /></ProtectedRoute>
-        } />
+       <Route path="/vision" element={<LiveVision />} />
         <Route path='/home' element={
           <ProtectedRoute><Home /></ProtectedRoute>
         } />
