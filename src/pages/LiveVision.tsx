@@ -276,7 +276,7 @@ const LiveVision: React.FC = () => {
   };
 
   // --- LOGIC B: TARGET MODE ---
-  const processTargetMode = (predictions: any[], ctx: CanvasRenderingContext2D, width: number, height: number) => {
+  const processTargetMode = (predictions: any[], ctx: CanvasRenderingContext2D, _width: number, height: number) => {
     let foundTarget = false;
     let exactMeters = 0;
 
