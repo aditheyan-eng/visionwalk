@@ -67,7 +67,7 @@ const Home: React.FC = () => {
   const saveGuardian = async () => {
     if (!user) return;
     try {
-      const res = await axios.post('http://localhost:8080/api/guardian', {
+      const res = await axios.post('https://visionwalk-backend.onrender.com/api/guardian', {
         userId: user.id.toString(),
         guardianEmail: tempEmail
       });
@@ -83,7 +83,7 @@ const Home: React.FC = () => {
   const deleteGuardian = async () => {
     if (!user) return;
     try {
-      const res = await axios.post('http://localhost:8080/api/guardian', {
+      const res = await axios.post('https://visionwalk-backend.onrender.com/api/guardian', {
         userId: user.id.toString(),
         guardianEmail: "" 
       });
@@ -103,7 +103,7 @@ const Home: React.FC = () => {
 
     navigator.geolocation.getCurrentPosition(async (pos) => {
       try {
-        await axios.post('http://localhost:8080/api/alert', {
+        await axios.post('https://visionwalk-backend.onrender.com/api/alert', {
             userId: userRef.current?.id,
             lat: pos.coords.latitude,
             lng: pos.coords.longitude

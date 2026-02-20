@@ -32,7 +32,7 @@ const Login: React.FC = () => {
     const payload = isSignup ? { name, email, password } : { email, password };
 
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const API_BASE_URL = import.meta.env.VITE_API_URL || "https://visionwalk-backend.onrender.com";
       
       const res = await axios.post(`${API_BASE_URL}${endpoint}`, payload);
       
