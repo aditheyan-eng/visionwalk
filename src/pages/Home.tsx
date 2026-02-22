@@ -122,7 +122,8 @@ const Home: React.FC = () => {
         const PUBLIC_KEY = "rbtoUP--BpijCqTh7";
 
         // 2. Generate a clean Google Maps link
-        const mapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        // Delete the old mapsLink and paste this exact line:
+const mapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 
         // 3. Match the variables exactly as typed in your EmailJS template
         const templateParams = {
