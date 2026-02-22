@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import * as Vosk from 'vosk-browser';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import emailjs from '@emailjs/browser'; // <-- NEW IMPORT
 import './Home.css'; 
 
 interface User {
@@ -97,23 +98,57 @@ const Home: React.FC = () => {
     }
   };
 
+  // --- NEW EMAILJS EMERGENCY LOGIC ---
   const triggerEmergency = async () => {
     speak("Initiating emergency alert. Finding your location.");
+    
     if (!navigator.geolocation || !userRef.current) return;
 
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      try {
-        await axios.post('https://visionwalk-backend.onrender.com/api/alert', {
-            userId: userRef.current?.id,
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-        });
-        speak("Emergency alert sent successfully. Your guardian has been notified.");
-        setStatus("SOS Sent!");
-      } catch (e: any) { 
-        speak("Alert failed. Please ensure a guardian email is set."); 
+    const guardianEmail = userRef.current.guardianEmail;
+    if (!guardianEmail) {
+        speak("Alert failed. Please set a guardian email in your settings first.");
+        setStatus("No Guardian Set!");
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        
+        // 1. PASTE YOUR EMAILJS KEYS HERE
+        const SERVICE_ID = "service_fy7hkfh";
+        const TEMPLATE_ID = "template_l7875ip";
+        const PUBLIC_KEY = "rbtoUP--BpijCqTh7";
+
+        // 2. Generate a clean Google Maps link
+        const mapsLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
+        // 3. Match the variables exactly as typed in your EmailJS template
+        const templateParams = {
+            to_email: guardianEmail,
+            userName: userRef.current?.name || "User",
+            mapsLink: mapsLink
+        };
+
+        // 4. Send the email directly from the browser!
+        emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
+            .then((response) => {
+                console.log("SOS Email sent successfully!", response.status, response.text);
+                speak("Emergency alert sent successfully. Your guardian has been notified.");
+                setStatus("SOS Sent!");
+            })
+            .catch((error) => {
+                console.error("Failed to send SOS Email:", error);
+                speak("Alert failed due to a network error.");
+                setStatus("SOS Failed");
+            });
+      }, 
+      (error) => {
+        console.error("GPS Error:", error);
+        speak("Could not find your location. Please ensure GPS is enabled.");
       }
-    });
+    );
   };
 
   const handleLogout = () => {
