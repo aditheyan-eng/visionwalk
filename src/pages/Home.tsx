@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import * as Vosk from 'vosk-browser';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import emailjs from '@emailjs/browser'; // <-- NEW IMPORT
+import emailjs from '@emailjs/browser';
 import './Home.css'; 
 
 interface User {
@@ -116,23 +116,20 @@ const Home: React.FC = () => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         
-        // 1. PASTE YOUR EMAILJS KEYS HERE
+        // 1. Your exact EmailJS Keys
         const SERVICE_ID = "service_fy7hkfh";
         const TEMPLATE_ID = "template_l7875ip";
         const PUBLIC_KEY = "rbtoUP--BpijCqTh7";
 
-        // 2. Generate a clean Google Maps link
-        // Delete the old mapsLink and paste this exact line:
-const mapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
-
-        // 3. Match the variables exactly as typed in your EmailJS template
+        // 2. Variables perfectly matched to your EmailJS Template
         const templateParams = {
             to_email: guardianEmail,
-            userName: userRef.current?.name || "User",
-            mapsLink: mapsLink
+            user_name: userRef.current?.name || "User",
+            lat: lat,
+            lng: lng
         };
 
-        // 4. Send the email directly from the browser!
+        // 3. Send the email directly from the browser!
         emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
             .then((response) => {
                 console.log("SOS Email sent successfully!", response.status, response.text);
