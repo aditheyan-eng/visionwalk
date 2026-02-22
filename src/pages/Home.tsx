@@ -171,7 +171,7 @@ const Home: React.FC = () => {
     // Redirect to Saved Locations Page
     if (cmd.includes("saved location")) { 
         speak("Opening your saved locations list.");
-        navigate('/locations'); 
+        navigate('/location'); 
         return; 
     }
 
@@ -258,7 +258,7 @@ const Home: React.FC = () => {
         </div>
         
         <div className="action-buttons-container">
-            <button className="glass-action-btn" onClick={() => navigate('/locations')}>📍 Saved Loc</button>
+            <button className="glass-action-btn" onClick={() => navigate('/location')}>📍 Saved Loc</button>
             <button className="glass-action-btn" onClick={triggerEmergency}>🆘 HELP</button>
         </div>
       </main>

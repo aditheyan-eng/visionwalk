@@ -8,6 +8,7 @@ import Signup from './pages/Signup';
 import LiveVision from './pages/LiveVision';
 import BeforeLogin from './pages/BeforeLogin';
 import Profile from './pages/Profile';
+import SavedLocations from './pages/SavedLocations';
 
 // --- Helper Component to Protect Routes ---
 // This checks if 'user' exists in localStorage. If not, it kicks them to login.
@@ -36,6 +37,9 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route path='/profile' element={
           <ProtectedRoute><Profile /></ProtectedRoute>
         } />
+        <Route path='/location' element={
+          <ProtectedRoute><SavedLocations/></ProtectedRoute>
+        }/>
       </Routes>
     </BrowserRouter>
   </React.StrictMode>
