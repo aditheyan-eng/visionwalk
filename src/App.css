@@ -1,3 +1,24 @@
+/* 1. Tell everything to include padding inside its width */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 2. Remove default browser margins and prevent side-scrolling */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden; /* Absolutely prevents side-to-side scrolling! */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  -webkit-tap-highlight-color: transparent; /* Removes ugly blue tap boxes on mobile */
+}
+
+/* 3. Make sure images and videos never overflow their containers */
+img, video {
+  max-width: 100%;
+  height: auto;
+}
+
 #root {
   max-width: 1280px;
   margin: 0 auto;
