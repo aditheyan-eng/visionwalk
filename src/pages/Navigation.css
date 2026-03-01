@@ -1,0 +1,133 @@
+.nav-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000;
+  overflow: hidden;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.video-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.canvas-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none; /* Let clicks pass through to UI */
+}
+
+.ui-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(26, 26, 46, 0.85);
+  backdrop-filter: blur(15px);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 25px 20px;
+  color: white;
+  z-index: 20;
+  box-sizing: border-box;
+  border-top-left-radius: 30px;
+  border-top-right-radius: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+  transition: transform 0.3s ease-in-out;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.status-ai { color: #4ade80; }
+.status-gps { color: #60a5fa; }
+.status-mic { color: #f87171; }
+
+.instruction-text {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.4;
+  font-weight: 700;
+  text-align: center;
+}
+
+.nav-exit-btn {
+  width: 100%;
+  padding: 15px;
+  background: rgba(255, 50, 50, 0.2);
+  border: 1px solid rgba(255, 50, 50, 0.5);
+  color: #ff6b6b;
+  border-radius: 15px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.nav-exit-btn:active {
+  background: rgba(255, 50, 50, 0.4);
+}
+
+/* POCKET MODE OVERLAY */
+.pocket-mode-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  z-index: 9999; /* Covers absolutely everything */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  color: #4ade80;
+  text-align: center;
+  padding: 20px;
+}
+
+.pocket-mode-overlay h1 {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.pocket-mode-overlay p {
+  font-size: 18px;
+  color: #aaa;
+}
+
+.lock-icon {
+  font-size: 60px;
+  margin-bottom: 20px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Mobile responsiveness adjustments */
+@media (max-width: 480px) {
+  .instruction-text {
+    font-size: 20px;
+  }
+  .ui-panel {
+    padding: 20px 15px;
+  }
+}

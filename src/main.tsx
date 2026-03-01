@@ -9,6 +9,7 @@ import LiveVision from './pages/LiveVision';
 import BeforeLogin from './pages/BeforeLogin';
 import Profile from './pages/Profile';
 import SavedLocations from './pages/SavedLocations';
+import Navigation from './pages/Navigation'; // <-- 1. IMPORT ADDED HERE
 
 // --- Helper Component to Protect Routes ---
 // This checks if 'user' exists in localStorage. If not, it kicks them to login.
@@ -30,15 +31,22 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route path="/signup" element={<Signup />} />
 
         {/* Protected Routes (User must be logged in to see these) */}
-       <Route path="/vision" element={<LiveVision />} />
+        <Route path="/vision" element={<LiveVision />} />
         <Route path='/home' element={
           <ProtectedRoute><Home /></ProtectedRoute>
         } />
         <Route path='/profile' element={
           <ProtectedRoute><Profile /></ProtectedRoute>
         } />
+        
+        {/* ⚠️ NOTE: Your path is '/location' (singular) */}
         <Route path='/location' element={
           <ProtectedRoute><SavedLocations/></ProtectedRoute>
+        }/>
+        
+        {/* 2. NEW NAVIGATION ROUTE ADDED HERE */}
+        <Route path='/navigation' element={
+          <ProtectedRoute><Navigation/></ProtectedRoute>
         }/>
       </Routes>
     </BrowserRouter>

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as Vosk from 'vosk-browser';
+import axios from 'axios';
 import './SavedLocations.css';
 
 interface SavedLocation {
-  id: number;
+  id?: number;
   name: string;
   lat: number;
   lng: number;
@@ -13,11 +14,7 @@ interface SavedLocation {
 const SavedLocations: React.FC = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState("Initializing...");
-  const [locations, setLocations] = useState<SavedLocation[]>([
-    // Dummy data so you can see the UI immediately. You will replace this with an Axios call later!
-    { id: 1, name: "Home", lat: 12.9716, lng: 77.5946 },
-    { id: 2, name: "Hospital", lat: 12.9352, lng: 77.6245 }
-  ]);
+  const [locations, setLocations] = useState<SavedLocation[]>([]);
   
   // Modal states
   const [showLinkModal, setShowLinkModal] = useState(false);
@@ -26,14 +23,34 @@ const SavedLocations: React.FC = () => {
 
   const modelRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const locationsRef = useRef(locations); // Keep ref updated for the voice command inside the Vosk listener
+  const locationsRef = useRef(locations); 
+  
+  // Get User ID from LocalStorage
+  const userStr = localStorage.getItem("user");
+  const userId = userStr ? JSON.parse(userStr).id : null;
 
   useEffect(() => { locationsRef.current = locations; }, [locations]);
 
-  // --- 1. ENTRY VOICE GREETING & VOSK SETUP ---
+  // --- 1. FETCH FROM DATABASE & VOSK SETUP ---
   useEffect(() => {
-    speak("Saved locations menu. Say 'Save current location', 'Go to' followed by a name, or 'Back' to exit.");
-    
+    if (!userId) {
+      navigate('/login');
+      return;
+    }
+
+    // Fetch locations from Spring Boot Backend
+    const fetchLocations = async () => {
+      try {
+        setStatus("Fetching locations...");
+        const res = await axios.get(`https://visionwalk-backend.onrender.com/api/locations/${userId}`);
+        setLocations(res.data);
+        speak(`Saved locations loaded. You have ${res.data.length} locations. Say 'Save current location', 'Go to' followed by a name, or 'Back'.`);
+      } catch (err) {
+        console.error("Failed to load locations", err);
+        speak("Error loading your saved locations from the server.");
+      }
+    };
+
     async function loadVoiceModel() {
       try {
         const model = await Vosk.createModel('/models/vosk/model.tar.gz');
@@ -44,10 +61,12 @@ const SavedLocations: React.FC = () => {
         setStatus("Voice Error");
       }
     }
+
+    fetchLocations();
     loadVoiceModel();
 
-    return () => { stopListening(); }; // Cleanup on unmount
-  }, []);
+    return () => { stopListening(); }; 
+  }, [userId, navigate]);
 
   const speak = (text: string) => {
     window.speechSynthesis.cancel(); 
@@ -56,50 +75,57 @@ const SavedLocations: React.FC = () => {
     window.speechSynthesis.speak(utterance);
   };
 
-  // --- 2. CORE ACTIONS ---
+  // --- 2. DATABASE SAVE ACTIONS ---
+  const saveToDatabase = async (name: string, lat: number, lng: number) => {
+    try {
+      const res = await axios.post('https://visionwalk-backend.onrender.com/api/locations', {
+        userId: userId,
+        name: name,
+        lat: lat,
+        lng: lng
+      });
+      // Add the newly saved location from the database to our screen
+      setLocations(prev => [...prev, res.data]);
+      speak(`Success. ${name} has been permanently saved.`);
+    } catch (err) {
+      console.error("DB Save Error:", err);
+      speak("Error. Could not save location to the server.");
+    }
+  };
+
   const saveCurrentLocation = () => {
-    speak("Getting your current location.");
+    speak("Acquiring GPS signal to save current location.");
     if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition((pos) => {
-      const newLoc: SavedLocation = {
-        id: Date.now(),
-        name: `Saved Point ${locations.length + 1}`,
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude
-      };
-      setLocations([...locations, newLoc]);
-      speak(`Location saved as ${newLoc.name}.`);
+      const defaultName = `Saved Point ${locations.length + 1}`;
+      saveToDatabase(defaultName, pos.coords.latitude, pos.coords.longitude);
     }, () => {
-      speak("Failed to get GPS location.");
-    });
+      speak("Failed to get GPS location. Please check permissions.");
+    }, { enableHighAccuracy: true });
   };
 
   const handleSaveLink = () => {
-    // Basic logic to save a link. In reality, you'd parse the lat/lng from the Google Maps URL
-    speak("Location saved from link.");
-    const newLoc: SavedLocation = {
-      id: Date.now(),
-      name: newLocName || "New Map Link",
-      lat: 0, // Placeholder until you write the link parser
-      lng: 0
-    };
-    setLocations([...locations, newLoc]);
+    speak("Saving location from link.");
+    // NOTE: Add actual link parsing logic here later to extract lat/lng!
+    saveToDatabase(newLocName || "New Map Link", 0, 0); 
     setShowLinkModal(false);
+    setNewLocName("");
+    setNewLink("");
   };
 
+  // --- 3. NAVIGATION REDIRECT ---
   const startNavigation = (loc: SavedLocation) => {
     speak(`Navigating to ${loc.name}. Starting guidance.`);
-    // Passes the coordinates to your actual vision/navigation page
-    navigate('/vision', { state: { targetLat: loc.lat, targetLng: loc.lng } });
+    navigate('/navigation', { state: { targetLat: loc.lat, targetLng: loc.lng } });
   };
 
   const handleBack = () => {
     speak("Returning to main menu.");
-    navigate(-1); // Goes to previous page
+    navigate('/home'); 
   };
 
-  // --- 3. VOICE COMMAND PROCESSOR ---
+  // --- 4. VOICE COMMAND PROCESSOR ---
   const handleCommand = (text: string) => {
     const cmd = text.toLowerCase().trim();
     if (!cmd) return;
@@ -116,7 +142,6 @@ const SavedLocations: React.FC = () => {
 
     // Logic for "Go to [Location Name]"
     if (cmd.includes("go to") || cmd.includes("navigate to")) {
-        // Look through saved locations to find a match
         const foundLocation = locationsRef.current.find(loc => 
             cmd.includes(loc.name.toLowerCase())
         );
@@ -130,7 +155,7 @@ const SavedLocations: React.FC = () => {
     }
   };
 
-  // --- 4. VOSK AUDIO ENGINE ---
+  // --- 5. VOSK AUDIO ENGINE ---
   const startListening = async (model: any) => {
     try {
         const ctx = new AudioContext({ sampleRate: 16000 });
@@ -186,13 +211,19 @@ const SavedLocations: React.FC = () => {
       </div>
 
       <div className="locations-grid">
-        {locations.map((loc) => (
-          <div key={loc.id} className="location-card" onClick={() => startNavigation(loc)}>
-            <div className="location-name">{loc.name}</div>
-            <div className="location-coords">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</div>
-            <button className="go-btn">Go Here</button>
-          </div>
-        ))}
+        {locations.length === 0 ? (
+          <p style={{ textAlign: 'center', width: '100%', color: '#aaa' }}>
+            No saved locations yet. Say "Save current location" to add one!
+          </p>
+        ) : (
+          locations.map((loc, index) => (
+            <div key={loc.id || index} className="location-card" onClick={() => startNavigation(loc)}>
+              <div className="location-name">{loc.name}</div>
+              <div className="location-coords">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</div>
+              <button className="go-btn">Go Here</button>
+            </div>
+          ))
+        )}
       </div>
 
       {/* MODAL FOR SAVING VIA LINK */}
