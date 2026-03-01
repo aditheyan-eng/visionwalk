@@ -19,7 +19,7 @@ const Home: React.FC = () => {
   const [status, setStatus] = useState("Initializing...");
   const [isPocketMode, setIsPocketMode] = useState(false);
   
-  // Modal States for Guardian Email
+  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tempEmail, setTempEmail] = useState("");
 
@@ -47,15 +47,16 @@ const Home: React.FC = () => {
         const model = await Vosk.createModel('/models/vosk/model.tar.gz');
         modelRef.current = model;
         setStatus("Ready");
-        speak("System online. Say Start to begin or Saved Location to view your places.");
+        speak("System online. Say 'Start', 'Saved Location', or 'Logout'.");
       } catch (err) {
         setStatus("Voice Model Error");
       }
     }
     loadModel();
+
+    return () => { stopListening(); }; // Cleanup on unmount
   }, [navigate]); 
 
-  // --- 2. VOICE FEEDBACK HELPER ---
   const speak = (text: string) => {
     window.speechSynthesis.cancel(); 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -63,8 +64,7 @@ const Home: React.FC = () => {
     window.speechSynthesis.speak(utterance);
   };
 
-  // --- 3. CORE ACTIONS ---
-  
+  // --- 2. CORE ACTIONS ---
   const saveGuardian = async () => {
     if (!user) return;
     try {
@@ -75,7 +75,7 @@ const Home: React.FC = () => {
       localStorage.setItem("user", JSON.stringify(res.data));
       setUser(res.data);
       setIsModalOpen(false);
-      speak("Success. Guardian email updated to " + tempEmail);
+      speak("Success. Guardian email updated.");
     } catch (e) {
       speak("Error. I could not save the guardian email.");
     }
@@ -92,60 +92,41 @@ const Home: React.FC = () => {
       setUser(res.data);
       setTempEmail("");
       setIsModalOpen(false);
-      speak("Success. Guardian email has been removed.");
+      speak("Guardian removed.");
     } catch (e) {
-      speak("Error. Failed to remove guardian.");
+      speak("Failed to remove guardian.");
     }
   };
 
-  // --- NEW EMAILJS EMERGENCY LOGIC ---
   const triggerEmergency = async () => {
-    speak("Initiating emergency alert. Finding your location.");
-    
+    speak("Initiating emergency alert.");
     if (!navigator.geolocation || !userRef.current) return;
 
     const guardianEmail = userRef.current.guardianEmail;
     if (!guardianEmail) {
-        speak("Alert failed. Please set a guardian email in your settings first.");
+        speak("Please set a guardian email in settings first.");
         setStatus("No Guardian Set!");
         return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        
-        // 1. Your exact EmailJS Keys
-        const SERVICE_ID = "service_fy7hkfh";
-        const TEMPLATE_ID = "template_l7875ip";
-        const PUBLIC_KEY = "rbtoUP--BpijCqTh7";
-
-        // 2. Variables perfectly matched to your EmailJS Template
-        const templateParams = {
+        emailjs.send("service_fy7hkfh", "template_l7875ip", {
             to_email: guardianEmail,
             user_name: userRef.current?.name || "User",
-            lat: lat,
-            lng: lng
-        };
-
-        // 3. Send the email directly from the browser!
-        emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
-            .then((response) => {
-                console.log("SOS Email sent successfully!", response.status, response.text);
-                speak("Emergency alert sent successfully. Your guardian has been notified.");
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude
+        }, "rbtoUP--BpijCqTh7")
+            .then(() => {
+                speak("Alert sent.");
                 setStatus("SOS Sent!");
             })
-            .catch((error) => {
-                console.error("Failed to send SOS Email:", error);
-                speak("Alert failed due to a network error.");
+            .catch(() => {
+                speak("Alert failed.");
                 setStatus("SOS Failed");
             });
       }, 
-      (error) => {
-        console.error("GPS Error:", error);
-        speak("Could not find your location. Please ensure GPS is enabled.");
-      }
+      () => speak("Could not find location.")
     );
   };
 
@@ -155,44 +136,50 @@ const Home: React.FC = () => {
     navigate('/login');
   };
 
-  // --- 4. VOICE COMMAND LOGIC ---
+  // --- 3. VOICE COMMAND LOGIC ---
   const handleCommand = (text: string) => {
     const cmd = text.toLowerCase().trim();
     if (!cmd) return;
 
     if (isPocketModeRef.current) {
-        if (cmd.includes("unlock")) { 
+        if (cmd.includes("unlock") || cmd.includes("disable pocket mode")) { 
             speak("System unlocked."); 
             setIsPocketMode(false); 
         }
         return;
     }
 
-    // Redirect to Saved Locations Page
-    if (cmd.includes("saved location")) { 
-        speak("Opening your saved locations list.");
+    // Voice Routing Commands!
+    if (cmd.includes("saved location") || cmd.includes("locations")) { 
+        speak("Opening saved locations.");
         navigate('/location'); 
         return; 
     }
 
-    if (cmd.includes("start")) { 
+    if (cmd.includes("start") || cmd.includes("vision")) { 
         speak("Starting vision mode.");
         navigate('/vision'); 
         return; 
     }
 
-    if (cmd.includes("settings") || cmd.includes("profile")) { 
-        speak("Opening settings.");
-        setIsModalOpen(true); 
+    if (cmd.includes("logout") || cmd.includes("log out")) { 
+        handleLogout(); 
         return; 
     }
 
-    if (cmd.includes("help") || cmd.includes("emergency")) { triggerEmergency(); return; }
-    if (cmd.includes("pocket mode")) { speak("Screen locked."); setIsPocketMode(true); return; }
-    if (cmd.includes("logout")) { handleLogout(); return; }
+    if (cmd.includes("help") || cmd.includes("emergency")) { 
+        triggerEmergency(); 
+        return; 
+    }
+
+    if (cmd.includes("pocket mode")) { 
+        speak("Screen locked."); 
+        setIsPocketMode(true); 
+        return; 
+    }
   };
 
-  // --- 5. AUDIO HANDLING (VOSK) ---
+  // --- 4. AUDIO HANDLING ---
   const startListening = async () => {
     if (!modelRef.current) return;
     try {
@@ -203,7 +190,10 @@ const Home: React.FC = () => {
         const recognizer = new modelRef.current.KaldiRecognizer(16000);
         
         recognizer.on("result", (msg: any) => {
-            if (msg.result && msg.result.text) handleCommand(msg.result.text);
+            if (msg.result && msg.result.text) {
+                console.log("Heard:", msg.result.text);
+                handleCommand(msg.result.text);
+            }
         });
         
         const node = ctx.createScriptProcessor(4096, 1, 1);
@@ -228,58 +218,75 @@ const Home: React.FC = () => {
   };
 
   return (
-    <div className="app-container">
+    <div className="home-container">
       {isPocketMode && (
         <div className="pocket-overlay">
+            <div className="lock-icon">🔒</div>
             <h1>LOCKED</h1>
-            <p>Say "Unlock" to enable screen</p>
+            <p>Touch disabled.</p>
+            <p style={{ marginTop: '20px', color: '#fff' }}>Say <strong>"Unlock"</strong></p>
         </div>
       )}
       
-      <header className="dashboard-header">
-         <div className="user-info" onClick={() => setIsModalOpen(true)} style={{cursor:'pointer'}}>
-            <div className="user-avatar">👤</div>
-            <span className="user-name">{user?.name || "User"}</span>
+      {/* HEADER */}
+      <header className="home-header">
+         <div className="user-profile-btn" onClick={() => setIsModalOpen(true)}>
+            <span className="avatar">👤</span>
+            <span className="name">{user?.name || "User"}</span>
          </div>
-         <button className="logout-btn" onClick={handleLogout}>Logout</button>
+         <button className="logout-button" onClick={handleLogout}>Logout</button>
       </header>
 
-      <main className="main-content">
-        <div className="status-label">{status}</div>
+      {/* MAIN CONTENT AREA */}
+      <main className="home-main">
+        <div className="mic-status">{status}</div>
         
-        <div className="orb-container">
-            {isListening && <div className="ripple"></div>}
-            <button className={`orb-btn ${isListening ? 'listening' : ''}`} onClick={() => isListening ? stopListening() : startListening()}>
-               <div className="orb-text">
-                  <span className="orb-icon">{isListening ? '🎙️' : '👆'}</span>
-                  <span>{isListening ? 'LISTENING' : 'START'}</span>
-               </div>
+        {/* BIG CENTER BUTTON */}
+        <div className="center-orb-wrapper">
+            {isListening && <div className="pulse-ring"></div>}
+            <button 
+                className={`main-orb ${isListening ? 'active' : ''}`} 
+                onClick={() => isListening ? stopListening() : startListening()}
+            >
+               <span className="orb-emoji">{isListening ? '🎙️' : '👆'}</span>
+               <span className="orb-label">{isListening ? 'LISTENING' : 'START MIC'}</span>
             </button>
         </div>
         
-        <div className="action-buttons-container">
-            <button className="glass-action-btn" onClick={() => navigate('/location')}>📍 Saved Loc</button>
-            <button className="glass-action-btn" onClick={triggerEmergency}>🆘 HELP</button>
+        {/* BOTTOM ACTION BUTTONS */}
+        <div className="bottom-actions">
+            <button className="nav-card" onClick={() => navigate('/vision')}>
+                <span className="card-icon">👁️</span>
+                <span className="card-text">Vision</span>
+            </button>
+            <button className="nav-card" onClick={() => navigate('/location')}>
+                <span className="card-icon">📍</span>
+                <span className="card-text">Saved Loc</span>
+            </button>
+            <button className="nav-card emergency" onClick={triggerEmergency}>
+                <span className="card-icon">🆘</span>
+                <span className="card-text">HELP</span>
+            </button>
         </div>
       </main>
 
-      {/* GUARDIAN MODAL */}
+      {/* MODAL */}
       {isModalOpen && (
-        <div className="modal-overlay">
-          <div className="guardian-modal">
+        <div className="modal-bg">
+          <div className="settings-modal">
             <h2>Guardian Settings</h2>
             <input 
               type="email" 
               placeholder="Guardian Email" 
               value={tempEmail}
               onChange={(e) => setTempEmail(e.target.value)}
-              className="modal-input"
+              className="settings-input"
             />
-            <div className="modal-actions">
-              <button onClick={saveGuardian} className="save-btn">Save</button>
-              <button onClick={deleteGuardian} className="delete-btn">Remove</button>
-              <button onClick={() => setIsModalOpen(false)} className="close-btn">Close</button>
+            <div className="settings-btn-row">
+              <button onClick={saveGuardian} className="btn-save">Save</button>
+              <button onClick={deleteGuardian} className="btn-remove">Remove</button>
             </div>
+            <button onClick={() => setIsModalOpen(false)} className="btn-close">Close</button>
           </div>
         </div>
       )}

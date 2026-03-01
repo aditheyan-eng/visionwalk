@@ -11,12 +11,13 @@
 
 * {
   box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent; /* Removes blue highlight on mobile tap */
+  -webkit-tap-highlight-color: transparent; 
 }
 
 body, html {
   margin: 0;
   padding: 0;
+  width: 100%;
   height: 100%;
   overflow: hidden; /* Prevents scrolling */
   font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
@@ -28,7 +29,8 @@ body, html {
 .app-container {
   position: relative;
   width: 100vw;
-  height: 100vh;
+  /* FIXED: 100dvh ensures the bottom buttons aren't hidden by mobile browser bars */
+  height: 100dvh; 
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -74,8 +76,8 @@ body, html {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 25px;
-  background: rgba(15, 23, 42, 0.6); /* Semi-transparent header */
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.6); 
   backdrop-filter: blur(10px);
 }
 
@@ -126,25 +128,24 @@ body, html {
 
 /* --- Main Content Area --- */
 .main-content {
-  flex: 1;
+  flex: 1; /* FIXED: Takes up all space between header and bottom buttons */
   display: flex;
   flex-direction: column;
-  justify-content: center; /* Vertically center the orb */
+  justify-content: space-between; /* Pushes status to top, orb to center, buttons to bottom */
   align-items: center;
   position: relative;
   z-index: 10;
-  padding-bottom: 100px; /* Make space for bottom buttons */
+  padding: 20px;
 }
 
 .status-label {
-  margin-bottom: 40px;
   font-size: 1.1rem;
   color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 2px;
   font-weight: 500;
   text-align: center;
-  min-height: 27px; /* Prevent layout jump */
+  margin-top: 10px;
 }
 
 /* --- The Giant Orb Button --- */
@@ -153,11 +154,12 @@ body, html {
   display: flex;
   justify-content: center;
   align-items: center;
+  flex: 1; /* FIXED: Automatically vertically centers the orb */
 }
 
 .orb-btn {
-  width: 280px;  /* Large touch target */
-  height: 280px;
+  width: 250px;  /* Slightly reduced to guarantee fit on tiny screens */
+  height: 250px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.1);
   background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.4));
@@ -166,7 +168,7 @@ body, html {
   position: relative;
   z-index: 20;
   backdrop-filter: blur(5px);
-  box-shadow: 0 0 30px rgba(6, 182, 212, 0.15); /* Subtle glow */
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.15); 
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
 }
@@ -176,7 +178,6 @@ body, html {
   background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.2), rgba(0, 0, 0, 0.5));
 }
 
-/* Active Listening State */
 .orb-btn.listening {
   border-color: var(--accent);
   box-shadow: 0 0 60px rgba(34, 197, 94, 0.3);
@@ -193,7 +194,7 @@ body, html {
   align-items: center;
   justify-content: center;
   gap: 15px;
-  pointer-events: none; /* Let clicks pass through to button */
+  pointer-events: none; 
 }
 
 .orb-icon {
@@ -208,7 +209,6 @@ body, html {
   text-transform: uppercase;
 }
 
-/* Animations */
 @keyframes heartbeat {
   0% { transform: scale(1); }
   15% { transform: scale(1.05); }
@@ -218,11 +218,10 @@ body, html {
   100% { transform: scale(1); }
 }
 
-/* Ripple Effect (Behind the button) */
 .ripple {
   position: absolute;
-  width: 100%;
-  height: 100%;
+  width: 250px;
+  height: 250px;
   border-radius: 50%;
   border: 2px solid var(--accent);
   opacity: 0;
@@ -230,37 +229,32 @@ body, html {
   z-index: 0;
 }
 
-.ripple:nth-child(2) {
-  animation-delay: 1s;
-}
-
 @keyframes ripple-anim {
   0% { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(2); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
 }
 
 /* --- Bottom Action Buttons --- */
 .action-buttons-container {
-  position: absolute;
-  bottom: 40px;
-  left: 0;
+  /* FIXED: Removed absolute positioning. It now sits safely at the bottom of the flex container */
   width: 100%;
+  max-width: 500px;
   display: flex;
-  justify-content: space-evenly;
-  padding: 0 20px;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px; /* Gives safe padding from the absolute bottom of the phone */
 }
 
 .glass-action-btn {
   flex: 1;
-  max-width: 160px;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(12px);
   color: var(--text-color);
-  padding: 16px;
-  border-radius: 24px;
+  padding: 15px 10px;
+  border-radius: 20px;
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: bold;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -268,26 +262,11 @@ body, html {
   align-items: center;
   gap: 8px;
   text-align: center;
-  margin: 0 10px;
 }
 
 .glass-action-btn:active {
   background: rgba(255, 255, 255, 0.1);
   transform: translateY(2px);
-}
-
-/* Media Query for Small Screens */
-@media (max-width: 380px) {
-  .orb-btn {
-    width: 240px;
-    height: 240px;
-  }
-  .orb-icon {
-    font-size: 3rem;
-  }
-  .action-buttons-container {
-    bottom: 20px;
-  }
 }
 
 /* --- Pocket Mode Overlay --- */
@@ -297,12 +276,12 @@ body, html {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background-color: #000000; /* Pure black to save OLED battery */
-    z-index: 9999; /* Sit on top of EVERYTHING */
+    background-color: #000000; 
+    z-index: 9999; 
     display: flex;
     justify-content: center;
     align-items: center;
-    touch-action: none; /* Disable gestures */
+    touch-action: none; 
 }
 
 .pocket-content {
@@ -310,45 +289,37 @@ body, html {
     flex-direction: column;
     align-items: center;
     gap: 20px;
-    color: #333; /* Very dim text */
+    color: #333; 
     font-family: sans-serif;
-    pointer-events: none; /* Clicks pass through (useless but safe) */
+    pointer-events: none; 
     user-select: none;
 }
 
-/* Optional: Pulse effect for the lock icon */
-.pocket-content i {
-    animation: dimPulse 3s infinite;
-}
-
-@keyframes dimPulse {
-    0% { opacity: 0.3; }
-    50% { opacity: 0.6; }
-    100% { opacity: 0.3; }
-}
-
+/* --- Modals --- */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.85); /* Dims the background */
+  background: rgba(0, 0, 0, 0.85); 
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 2000;
+  padding: 20px; /* Prevents modal from touching phone edges */
 }
 
 .guardian-modal {
   background: #1e293b;
-  padding: 30px;
+  padding: 25px;
   border-radius: 20px;
-  width: 90%;
-  max-width: 400px;
+  width: 100%;
+  max-width: 350px;
   text-align: center;
-  box-shadow: 0 0 30px rgba(6, 182, 212, 0.3); /* Cyan glow */
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.3); 
   border: 1px solid #334155;
+  box-sizing: border-box;
 }
 
 .modal-input {
@@ -360,6 +331,7 @@ body, html {
   background: #0f172a;
   color: white;
   font-size: 1rem;
+  box-sizing: border-box;
 }
 
 .modal-actions {
@@ -369,5 +341,13 @@ body, html {
 }
 
 .save-btn { background: #06b6d4; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
-.delete-btn { background: #ef4444; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; }
-.close-btn { background: transparent; color: #94a3b8; border: none; cursor: pointer; margin-top: 5px; }
+.delete-btn { background: #ef4444; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; }
+.close-btn { background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 12px; border-radius: 10px; cursor: pointer; margin-top: 5px; font-weight: bold; }
+
+/* --- Mobile Responsiveness Adjustments --- */
+@media (max-width: 380px) {
+  .orb-btn { width: 200px; height: 200px; }
+  .ripple { width: 200px; height: 200px; }
+  .orb-icon { font-size: 3rem; }
+  .glass-action-btn { font-size: 0.9rem; padding: 12px 8px; }
+}
