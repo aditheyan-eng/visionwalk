@@ -4,11 +4,14 @@ import * as Vosk from 'vosk-browser';
 import axios from 'axios';
 import './SavedLocations.css';
 
+// 1. FIXED INTERFACE: Added latitude and longitude to match Spring Boot
 interface SavedLocation {
   id?: number;
   name: string;
-  lat: number;
-  lng: number;
+  lat?: number;
+  lng?: number;
+  latitude?: number; 
+  longitude?: number;
 }
 
 const SavedLocations: React.FC = () => {
@@ -107,7 +110,6 @@ const SavedLocations: React.FC = () => {
 
   const handleSaveLink = () => {
     speak("Saving location from link.");
-    // NOTE: Add actual link parsing logic here later to extract lat/lng!
     saveToDatabase(newLocName || "New Map Link", 0, 0); 
     setShowLinkModal(false);
     setNewLocName("");
@@ -117,7 +119,10 @@ const SavedLocations: React.FC = () => {
   // --- 3. NAVIGATION REDIRECT ---
   const startNavigation = (loc: SavedLocation) => {
     speak(`Navigating to ${loc.name}. Starting guidance.`);
-    navigate('/navigation', { state: { targetLat: loc.lat, targetLng: loc.lng } });
+    // 2. FIXED ROUTING: Safely grabs either lat or latitude
+    const finalLat = loc.lat ?? loc.latitude;
+    const finalLng = loc.lng ?? loc.longitude;
+    navigate('/navigation', { state: { targetLat: finalLat, targetLng: finalLng } });
   };
 
   const handleBack = () => {
@@ -219,7 +224,10 @@ const SavedLocations: React.FC = () => {
           locations.map((loc, index) => (
             <div key={loc.id || index} className="location-card" onClick={() => startNavigation(loc)}>
               <div className="location-name">{loc.name}</div>
-              <div className="location-coords">{loc.lat.toFixed(4)}, {loc.lng.toFixed(4)}</div>
+              {/* 3. FIXED RENDER: Safely formats numbers even if DB returns Java naming */}
+              <div className="location-coords">
+                  {(loc.lat ?? loc.latitude || 0).toFixed(4)}, {(loc.lng ?? loc.longitude || 0).toFixed(4)}
+              </div>
               <button className="go-btn">Go Here</button>
             </div>
           ))
