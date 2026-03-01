@@ -11,7 +11,7 @@
 
 * {
   box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent; 
+  -webkit-tap-highlight-color: transparent; /* Removes blue highlight on mobile tap */
 }
 
 body, html {
@@ -19,7 +19,7 @@ body, html {
   padding: 0;
   width: 100%;
   height: 100%;
-  overflow: hidden; /* Prevents scrolling */
+  overflow: hidden; /* Prevents scrolling completely */
   font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg-color);
   color: var(--text-color);
@@ -29,7 +29,7 @@ body, html {
 .app-container {
   position: relative;
   width: 100vw;
-  /* FIXED: 100dvh ensures the bottom buttons aren't hidden by mobile browser bars */
+  /* FIXED: 100dvh perfectly calculates mobile browser UI bars */
   height: 100dvh; 
   display: flex;
   flex-direction: column;
@@ -76,9 +76,10 @@ body, html {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 20px 25px;
   background: rgba(15, 23, 42, 0.6); 
   backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .user-info {
@@ -89,6 +90,11 @@ body, html {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: 30px;
+  transition: background 0.2s;
+}
+
+.user-info:active {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .user-avatar {
@@ -128,14 +134,14 @@ body, html {
 
 /* --- Main Content Area --- */
 .main-content {
-  flex: 1; /* FIXED: Takes up all space between header and bottom buttons */
+  flex: 1; /* Automatically takes all remaining height */
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* Pushes status to top, orb to center, buttons to bottom */
+  justify-content: space-between; /* Spaces out status, orb, and buttons */
   align-items: center;
   position: relative;
   z-index: 10;
-  padding: 20px;
+  padding: 20px 10px 30px 10px; /* Safe padding for bottom of screen */
 }
 
 .status-label {
@@ -145,7 +151,10 @@ body, html {
   letter-spacing: 2px;
   font-weight: 500;
   text-align: center;
-  margin-top: 10px;
+  min-height: 27px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 5px 15px;
+  border-radius: 15px;
 }
 
 /* --- The Giant Orb Button --- */
@@ -154,12 +163,12 @@ body, html {
   display: flex;
   justify-content: center;
   align-items: center;
-  flex: 1; /* FIXED: Automatically vertically centers the orb */
+  flex: 1; /* Vertically centers the orb safely */
 }
 
 .orb-btn {
-  width: 250px;  /* Slightly reduced to guarantee fit on tiny screens */
-  height: 250px;
+  width: 260px;  
+  height: 260px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.1);
   background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.4));
@@ -218,10 +227,11 @@ body, html {
   100% { transform: scale(1); }
 }
 
+/* Ripple Effect */
 .ripple {
   position: absolute;
-  width: 250px;
-  height: 250px;
+  width: 260px;
+  height: 260px;
   border-radius: 50%;
   border: 2px solid var(--accent);
   opacity: 0;
@@ -236,13 +246,12 @@ body, html {
 
 /* --- Bottom Action Buttons --- */
 .action-buttons-container {
-  /* FIXED: Removed absolute positioning. It now sits safely at the bottom of the flex container */
   width: 100%;
   max-width: 500px;
   display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-bottom: 20px; /* Gives safe padding from the absolute bottom of the phone */
+  justify-content: space-evenly;
+  gap: 10px;
+  /* Removed absolute positioning. Fits safely within the flow now! */
 }
 
 .glass-action-btn {
@@ -251,48 +260,49 @@ body, html {
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(12px);
   color: var(--text-color);
-  padding: 15px 10px;
+  padding: 15px 5px;
   border-radius: 20px;
   font-size: 1rem;
-  font-weight: bold;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 5px;
   text-align: center;
 }
 
 .glass-action-btn:active {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.15);
   transform: translateY(2px);
 }
 
 /* --- Pocket Mode Overlay --- */
 .pocket-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: #000000; 
-    z-index: 9999; 
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    touch-action: none; 
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000000; 
+  z-index: 9999; 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  touch-action: none; 
 }
 
 .pocket-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    color: #333; 
-    font-family: sans-serif;
-    pointer-events: none; 
-    user-select: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  color: #555; 
+  text-align: center;
+  pointer-events: none; 
+  user-select: none;
 }
 
 /* --- Modals --- */
@@ -307,19 +317,18 @@ body, html {
   justify-content: center;
   align-items: center;
   z-index: 2000;
-  padding: 20px; /* Prevents modal from touching phone edges */
+  padding: 20px;
 }
 
 .guardian-modal {
   background: #1e293b;
-  padding: 25px;
+  padding: 30px;
   border-radius: 20px;
   width: 100%;
   max-width: 350px;
   text-align: center;
   box-shadow: 0 0 30px rgba(6, 182, 212, 0.3); 
   border: 1px solid #334155;
-  box-sizing: border-box;
 }
 
 .modal-input {
@@ -327,11 +336,10 @@ body, html {
   padding: 12px;
   margin: 20px 0;
   border-radius: 10px;
-  border: 1px solid #06b6d4;
+  border: 1px solid var(--primary);
   background: #0f172a;
   color: white;
   font-size: 1rem;
-  box-sizing: border-box;
 }
 
 .modal-actions {
@@ -340,14 +348,25 @@ body, html {
   gap: 10px;
 }
 
-.save-btn { background: #06b6d4; color: white; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
-.delete-btn { background: #ef4444; color: white; border: none; padding: 12px; border-radius: 10px; cursor: pointer; font-weight: bold; }
-.close-btn { background: transparent; color: #94a3b8; border: 1px solid #334155; padding: 12px; border-radius: 10px; cursor: pointer; margin-top: 5px; font-weight: bold; }
+.save-btn, .delete-btn, .close-btn {
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: bold;
+  cursor: pointer;
+  border: none;
+}
+
+.save-btn { background: var(--primary); color: white; }
+.delete-btn { background: var(--danger); color: white; }
+.close-btn { background: transparent; color: #94a3b8; border: 1px solid #334155; margin-top: 5px; }
 
 /* --- Mobile Responsiveness Adjustments --- */
 @media (max-width: 380px) {
-  .orb-btn { width: 200px; height: 200px; }
-  .ripple { width: 200px; height: 200px; }
+  .orb-btn, .ripple {
+    width: 220px;
+    height: 220px;
+  }
   .orb-icon { font-size: 3rem; }
-  .glass-action-btn { font-size: 0.9rem; padding: 12px 8px; }
+  .action-buttons-container { gap: 5px; }
+  .glass-action-btn { padding: 12px 5px; font-size: 0.85rem; }
 }
