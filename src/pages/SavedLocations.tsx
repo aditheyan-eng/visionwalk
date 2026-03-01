@@ -4,7 +4,6 @@ import * as Vosk from 'vosk-browser';
 import axios from 'axios';
 import './SavedLocations.css';
 
-// 1. FIXED INTERFACE: Added latitude and longitude to match Spring Boot
 interface SavedLocation {
   id?: number;
   name: string;
@@ -41,7 +40,6 @@ const SavedLocations: React.FC = () => {
       return;
     }
 
-    // Fetch locations from Spring Boot Backend
     const fetchLocations = async () => {
       try {
         setStatus("Fetching locations...");
@@ -87,7 +85,6 @@ const SavedLocations: React.FC = () => {
         lat: lat,
         lng: lng
       });
-      // Add the newly saved location from the database to our screen
       setLocations(prev => [...prev, res.data]);
       speak(`Success. ${name} has been permanently saved.`);
     } catch (err) {
@@ -119,7 +116,6 @@ const SavedLocations: React.FC = () => {
   // --- 3. NAVIGATION REDIRECT ---
   const startNavigation = (loc: SavedLocation) => {
     speak(`Navigating to ${loc.name}. Starting guidance.`);
-    // 2. FIXED ROUTING: Safely grabs either lat or latitude
     const finalLat = loc.lat ?? loc.latitude;
     const finalLng = loc.lng ?? loc.longitude;
     navigate('/navigation', { state: { targetLat: finalLat, targetLng: finalLng } });
@@ -145,7 +141,6 @@ const SavedLocations: React.FC = () => {
         return;
     }
 
-    // Logic for "Go to [Location Name]"
     if (cmd.includes("go to") || cmd.includes("navigate to")) {
         const foundLocation = locationsRef.current.find(loc => 
             cmd.includes(loc.name.toLowerCase())
@@ -224,9 +219,9 @@ const SavedLocations: React.FC = () => {
           locations.map((loc, index) => (
             <div key={loc.id || index} className="location-card" onClick={() => startNavigation(loc)}>
               <div className="location-name">{loc.name}</div>
-              {/* 3. FIXED RENDER: Safely formats numbers even if DB returns Java naming */}
+              {/* FIXED TypeScript Error: Exclusively chaining ?? instead of mixing ?? and || */}
               <div className="location-coords">
-                  {(loc.lat ?? loc.latitude || 0).toFixed(4)}, {(loc.lng ?? loc.longitude || 0).toFixed(4)}
+                  {(loc.lat ?? loc.latitude ?? 0).toFixed(4)}, {(loc.lng ?? loc.longitude ?? 0).toFixed(4)}
               </div>
               <button className="go-btn">Go Here</button>
             </div>
@@ -234,7 +229,6 @@ const SavedLocations: React.FC = () => {
         )}
       </div>
 
-      {/* MODAL FOR SAVING VIA LINK */}
       {showLinkModal && (
         <div className="loc-modal-overlay">
           <div className="loc-modal">
