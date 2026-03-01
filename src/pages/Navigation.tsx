@@ -3,7 +3,21 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import * as tf from '@tensorflow/tfjs';
 import * as cocossd from '@tensorflow-models/coco-ssd';
 import * as Vosk from 'vosk-browser';
+import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import './Navigation.css';
+
+// Fix for default Leaflet marker icons not showing in React
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
+import markerIcon from 'leaflet/dist/images/marker-icon.png';
+import markerShadow from 'leaflet/dist/images/marker-shadow.png';
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
 
 const Navigation: React.FC = () => {
   const location = useLocation();
@@ -13,26 +27,29 @@ const Navigation: React.FC = () => {
   const targetLng = location.state?.targetLng;
 
   // UI States
-  const [navStatus, setNavStatus] = useState("Initializing Navigation...");
+  const [navStatus, setNavStatus] = useState("Initializing...");
   const [currentInstruction, setCurrentInstruction] = useState("Awaiting route...");
   const [aiStatus, setAiStatus] = useState("Loading AI...");
   const [isPocketMode, setIsPocketMode] = useState(false);
+  const [showMap, setShowMap] = useState(false); // Map Toggle State
 
-  // Refs for tracking and performance
+  // Map Data States
+  const [currentLoc, setCurrentLoc] = useState<[number, number] | null>(null);
+  const [routePath, setRoutePath] = useState<[number, number][]>([]);
+
+  // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const watchIdRef = useRef<number | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const voskModelRef = useRef<any>(null);
   
-  // Ref for Pocket Mode so the voice listener always has the freshest state
   const isPocketModeRef = useRef(false);
   useEffect(() => { isPocketModeRef.current = isPocketMode; }, [isPocketMode]);
 
   const [routeSteps, setRouteSteps] = useState<any[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-  // --- VOICE SPEECH SYNTHESIS ---
   const speak = (text: string, priority: boolean = false) => {
     if (priority) window.speechSynthesis.cancel(); 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -40,30 +57,30 @@ const Navigation: React.FC = () => {
     window.speechSynthesis.speak(utterance);
   };
 
-  // ==========================================
-  // ENGINE 1: VOICE COMMANDS (VOSK)
-  // ==========================================
+  // --- 1. VOICE COMMANDS (VOSK) ---
   const handleCommand = (text: string) => {
     const cmd = text.toLowerCase().trim();
     if (!cmd) return;
 
-    // If locked, ONLY listen for the unlock command
     if (isPocketModeRef.current) {
         if (cmd.includes("unlock") || cmd.includes("disable pocket mode")) {
             setIsPocketMode(false);
-            speak("Screen unlocked. Touch controls restored.");
+            speak("Screen unlocked.");
         }
         return; 
     }
 
     if (cmd.includes("pocket mode") || cmd.includes("lock screen")) {
         setIsPocketMode(true);
-        speak("Pocket mode activated. Touch controls disabled. Say 'Unlock' to restore.");
+        speak("Pocket mode activated. Say 'Unlock' to restore.");
         return;
     }
 
-    if (cmd.includes("back") || cmd.includes("exit") || cmd.includes("stop navigation")) {
-        speak("Ending navigation. Returning to previous menu.");
+    if (cmd.includes("show map")) { setShowMap(true); speak("Map view enabled."); return; }
+    if (cmd.includes("hide map") || cmd.includes("show camera")) { setShowMap(false); speak("Camera view enabled."); return; }
+
+    if (cmd.includes("back") || cmd.includes("exit")) {
+        speak("Ending navigation.");
         navigate(-1);
         return;
     }
@@ -89,20 +106,13 @@ const Navigation: React.FC = () => {
         node.onaudioprocess = (e) => recognizer.acceptWaveform(e.inputBuffer);
         source.connect(node);
         node.connect(ctx.destination);
-      } catch (err) {
-        console.error("Vosk error:", err);
-      }
+      } catch (err) { console.error("Vosk error:", err); }
     };
     initVosk();
-
-    return () => {
-      if (audioContextRef.current) audioContextRef.current.close();
-    };
+    return () => { if (audioContextRef.current) audioContextRef.current.close(); };
   }, []);
 
-  // ==========================================
-  // ENGINE 2: AI OBJECT DETECTION (CAMERA)
-  // ==========================================
+  // --- 2. AI OBJECT DETECTION ---
   useEffect(() => {
     let animationId: number;
     const startVisionEngine = async () => {
@@ -112,10 +122,7 @@ const Navigation: React.FC = () => {
         setAiStatus("AI Active");
 
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: "environment" }
-          });
-          
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
             videoRef.current.onloadedmetadata = () => {
@@ -124,9 +131,7 @@ const Navigation: React.FC = () => {
             };
           }
         }
-      } catch (err) {
-        setAiStatus("Camera Error");
-      }
+      } catch (err) { setAiStatus("Camera Error"); }
     };
 
     let lastSpokenObject = "";
@@ -148,7 +153,6 @@ const Navigation: React.FC = () => {
         ctx.fillStyle = '#4ade80';
         ctx.fillText(`${prediction.class}`, x, y > 10 ? y - 5 : 10);
 
-        // Warning Logic: If object is huge (close to user)
         if (width > ctx.canvas.width * 0.4) {
           const now = Date.now();
           if (prediction.class !== lastSpokenObject || now - lastSpokenTime > 5000) {
@@ -162,7 +166,6 @@ const Navigation: React.FC = () => {
     };
 
     startVisionEngine();
-
     return () => {
       cancelAnimationFrame(animationId);
       if (videoRef.current?.srcObject) {
@@ -171,9 +174,7 @@ const Navigation: React.FC = () => {
     };
   }, []);
 
-  // ==========================================
-  // ENGINE 3: GPS NAVIGATION (TOMTOM)
-  // ==========================================
+  // --- 3. GPS NAVIGATION (TOMTOM) ---
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3; 
     const rad = Math.PI / 180;
@@ -182,17 +183,14 @@ const Navigation: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!targetLat || !targetLng) {
-      speak("No destination provided.");
-      return;
-    }
-
-    const TOMTOM_KEY = "vdDUOcV80JnWR7hlCRGmKKbzFMQjycmr"; // ⚠️ PASTE YOUR TOMTOM KEY HERE
+    if (!targetLat || !targetLng) return;
+    const TOMTOM_KEY = "vdDUOcV80JnWR7hlCRGmKKbzFMQjycmr"; // ⚠️ KEEP YOUR KEY HERE
 
     const fetchRoute = () => {
       navigator.geolocation.getCurrentPosition(async (pos) => {
         const startLat = pos.coords.latitude;
         const startLng = pos.coords.longitude;
+        setCurrentLoc([startLat, startLng]); // Set initial map pin
         
         try {
           const url = `https://api.tomtom.com/routing/1/calculateRoute/${startLat},${startLng}:${targetLat},${targetLng}/json?instructionsType=text&travelMode=pedestrian&key=${TOMTOM_KEY}`;
@@ -201,18 +199,19 @@ const Navigation: React.FC = () => {
           
           if (data.routes && data.routes.length > 0) {
             const steps = data.routes[0].guidance.instructions;
+            
+            // Extract the path points to draw the blue line on the map!
+            const points = data.routes[0].legs[0].points.map((p: any) => [p.latitude, p.longitude]);
+            setRoutePath(points);
+
             setRouteSteps(steps);
             setNavStatus("Navigating");
             setCurrentInstruction(steps[0].message);
             speak(`Navigation started. ${steps[0].message}`);
           }
-        } catch (error) {
-          console.error("TomTom Routing error:", error);
-          setNavStatus("Routing failed.");
-        }
+        } catch (error) { setNavStatus("Routing failed."); }
       });
     };
-
     fetchRoute();
   }, [targetLat, targetLng]);
 
@@ -223,13 +222,10 @@ const Navigation: React.FC = () => {
       (position) => {
         const userLat = position.coords.latitude;
         const userLng = position.coords.longitude;
+        setCurrentLoc([userLat, userLng]); // Update the moving map pin!
         
         const nextTurn = routeSteps[currentStepIndex];
-        
-        const turnLat = nextTurn.point.latitude;
-        const turnLng = nextTurn.point.longitude;
-        
-        const distanceToTurn = calculateDistance(userLat, userLng, turnLat, turnLng);
+        const distanceToTurn = calculateDistance(userLat, userLng, nextTurn.point.latitude, nextTurn.point.longitude);
 
         if (distanceToTurn < 10) {
           if (currentStepIndex + 1 < routeSteps.length) {
@@ -248,46 +244,63 @@ const Navigation: React.FC = () => {
       (error) => console.error(error),
       { enableHighAccuracy: true, maximumAge: 0 } 
     );
-
-    return () => {
-      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
-    };
+    return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current); };
   }, [routeSteps, currentStepIndex]);
 
   return (
     <div className="nav-container">
-      {/* POCKET MODE OVERLAY - Blocks all touches beneath it */}
       {isPocketMode && (
         <div className="pocket-mode-overlay">
           <div className="lock-icon">🔒</div>
           <h1>Pocket Mode Active</h1>
-          <p>Touch controls disabled to prevent accidental clicks.</p>
+          <p>Touch controls disabled.</p>
           <p style={{ marginTop: '20px', color: '#fff' }}>Say <strong>"Unlock"</strong> to restore screen.</p>
         </div>
       )}
 
-      {/* 1. Camera Feed */}
-      <video ref={videoRef} className="video-layer" playsInline muted />
-      
-      {/* 2. AI Canvas Overlay */}
-      <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight} className="canvas-layer" />
+      {/* BACKGROUND TOGGLE: Show Map OR Show Camera */}
+      {showMap && currentLoc ? (
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
+            <MapContainer center={currentLoc} zoom={16} style={{ height: '100%', width: '100%' }}>
+                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                {routePath.length > 0 && <Polyline positions={routePath} color="#4ade80" weight={5} />}
+                <Marker position={currentLoc}>
+                    <Popup>You are here</Popup>
+                </Marker>
+            </MapContainer>
+        </div>
+      ) : (
+        <>
+            <video ref={videoRef} className="video-layer" playsInline muted />
+            <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight} className="canvas-layer" />
+        </>
+      )}
 
-      {/* 3. Glassmorphism UI Panel */}
+      {/* UI PANEL */}
       <div className="ui-panel">
         <div className="status-row">
             <span className="status-ai">🤖 {aiStatus}</span>
-            <span className="status-mic">🎙️ Listening...</span>
             <span className="status-gps">📍 {navStatus}</span>
         </div>
         
         <h2 className="instruction-text">{currentInstruction}</h2>
 
-        <button 
-            className="nav-exit-btn"
-            onClick={() => { speak("Ending navigation."); navigate(-1); }}
-        >
-            Exit Navigation
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+            <button 
+                className="nav-exit-btn"
+                style={{ flex: 1, background: 'rgba(255, 255, 255, 0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
+                onClick={() => { setShowMap(!showMap); speak(showMap ? "Camera view enabled." : "Map view enabled."); }}
+            >
+                {showMap ? "📷 Show Camera" : "🗺️ Show Map"}
+            </button>
+            <button 
+                className="nav-exit-btn"
+                style={{ flex: 1 }}
+                onClick={() => { speak("Ending navigation."); navigate(-1); }}
+            >
+                Exit Navigation
+            </button>
+        </div>
       </div>
     </div>
   );
