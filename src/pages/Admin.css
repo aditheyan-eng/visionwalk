@@ -1,0 +1,136 @@
+.admin-wrapper {
+  min-height: 100vh;
+  background-color: #0f172a;
+  color: #f8fafc;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* --- Admin Login Box --- */
+.admin-login-box {
+  background: #1e293b;
+  padding: 40px;
+  border-radius: 15px;
+  border: 1px solid #334155;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 90%;
+  max-width: 400px;
+}
+
+.admin-login-box h2 {
+  text-align: center;
+  color: #f59e0b; /* Amber warning color */
+  margin-bottom: 10px;
+}
+
+.admin-input {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #475569;
+  background: #0f172a;
+  color: white;
+}
+
+.admin-btn {
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: #f59e0b;
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* --- Admin Dashboard Layout --- */
+.admin-dashboard {
+  width: 100%;
+  min-height: 100vh;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.admin-header {
+  width: 100%;
+  max-width: 1000px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 15px;
+}
+
+.admin-header h1 {
+  color: #f59e0b;
+}
+
+.admin-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  width: 100%;
+  max-width: 1000px;
+}
+
+/* --- Panels --- */
+.admin-panel {
+  flex: 1;
+  min-width: 300px;
+  background: #1e293b;
+  padding: 20px;
+  border-radius: 15px;
+  border: 1px solid #334155;
+}
+
+.admin-panel h3 {
+  margin-top: 0;
+  color: #38bdf8;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+/* --- User List --- */
+.user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.user-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #0f172a;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
+
+.user-details strong {
+  display: block;
+  font-size: 16px;
+}
+.user-details span {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.delete-user-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}

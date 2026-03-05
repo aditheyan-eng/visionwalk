@@ -10,7 +10,7 @@ import BeforeLogin from './pages/BeforeLogin';
 import Profile from './pages/Profile';
 import SavedLocations from './pages/SavedLocations';
 import Navigation from './pages/Navigation'; // <-- 1. IMPORT ADDED HERE
-
+import Admin from './pages/Admin';
 // --- Helper Component to Protect Routes ---
 // This checks if 'user' exists in localStorage. If not, it kicks them to login.
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -29,7 +29,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route path='/' element={<BeforeLogin/>}/>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-
+<Route path="/admin" element={<Admin />} />
         {/* Protected Routes (User must be logged in to see these) */}
         <Route path="/vision" element={<LiveVision />} />
         <Route path='/home' element={
