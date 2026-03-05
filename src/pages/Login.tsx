@@ -28,6 +28,14 @@ const Login: React.FC = () => {
     setIsLoading(true);
     setError("");
 
+    // --- 🚨 THE SECRET ADMIN BYPASS 🚨 ---
+    if (!isSignup && email === "admin@visionwalk.com" && password === "admin123") {
+      setIsLoading(false);
+      navigate('/admin'); // Instantly redirects to the admin page!
+      return; 
+    }
+    // --------------------------------------
+
     const endpoint = isSignup ? '/api/signup' : '/api/login';
     const payload = isSignup ? { name, email, password } : { email, password };
 
@@ -55,7 +63,6 @@ const Login: React.FC = () => {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        {/* --- THE NEW BACK ARROW --- */}
         <button 
           onClick={() => navigate('/')} 
           style={styles.backButton}
@@ -121,9 +128,7 @@ const Login: React.FC = () => {
 // --- STYLING ---
 const styles = {
   container: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0f172a', fontFamily: 'Arial, sans-serif' },
-  // Notice the 'position: relative' added here so the back button stays inside the card
   card: { position: 'relative' as const, background: '#1e293b', padding: '40px', borderRadius: '16px', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', width: '100%', maxWidth: '400px', textAlign: 'center' as const },
-  // The new back button styles
   backButton: { position: 'absolute' as const, top: '20px', left: '20px', background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '1.5rem', cursor: 'pointer', transition: 'color 0.3s' },
   title: { color: '#06b6d4', fontSize: '2rem', fontWeight: 'bold', marginBottom: '8px', letterSpacing: '2px', marginTop: '10px' },
   subtitle: { color: '#94a3b8', marginBottom: '30px' },
