@@ -28,16 +28,12 @@ const Login: React.FC = () => {
     setIsLoading(true);
     setError("");
 
-    // --- 🚨 THE SECRET ADMIN BYPASS 🚨 ---
-    if (!isSignup && email === "admin@visionwalk.com" && password === "admin123") {
-      setIsLoading(false);
-      navigate('/admin'); // Instantly redirects to the admin page!
-      return; 
-    }
-    // --------------------------------------
+    // 1. Clean the inputs to avoid hidden space bugs
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
 
     const endpoint = isSignup ? '/api/signup' : '/api/login';
-    const payload = isSignup ? { name, email, password } : { email, password };
+    const payload = isSignup ? { name, email: cleanEmail, password: cleanPassword } : { email: cleanEmail, password: cleanPassword };
 
     try {
       const API_BASE_URL = import.meta.env.VITE_API_URL || "https://visionwalk-backend.onrender.com";
@@ -49,12 +45,18 @@ const Login: React.FC = () => {
         setIsSignup(false);
         setPassword("");
       } else {
-        localStorage.setItem("user", JSON.stringify(res.data));
-        navigate('/home');
+        // 🚨 SECURE BACKEND REDIRECT 🚨
+        // We check the payload from the backend to see if this is the Admin
+        if (res.data.role === "ADMIN" || res.data.email === "admin@visionwalk.com") {
+            navigate('/admin'); // Send to Command Center
+        } else {
+            localStorage.setItem("user", JSON.stringify(res.data));
+            navigate('/home'); // Send normal users to Home
+        }
       }
     } catch (err: any) {
       console.error("Auth Error:", err);
-      setError(err.response?.data || "Something went wrong. Please try again.");
+      setError(err.response?.data || "Invalid credentials. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -86,9 +88,10 @@ const Login: React.FC = () => {
             />
           )}
           
+          {/* CHANGED to text so you can use simple usernames like "admin" without browser errors */}
           <input
-            type="email"
-            placeholder="Email Address"
+            type="text"
+            placeholder={isSignup ? "Email Address" : "Email or Username"}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             style={styles.input}
