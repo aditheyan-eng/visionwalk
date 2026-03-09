@@ -200,10 +200,7 @@ const SavedLocations: React.FC = () => {
           <span className="action-icon">📍</span>
           Save Current
         </button>
-        <button className="action-btn" onClick={() => speak("Map selection coming soon.")}>
-          <span className="action-icon">🗺️</span>
-          Mark on Map
-        </button>
+     
         <button className="action-btn" onClick={() => setShowLinkModal(true)}>
           <span className="action-icon">🔗</span>
           Save via Link
