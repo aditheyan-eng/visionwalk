@@ -87,6 +87,10 @@ const SavedLocations: React.FC = () => {
       });
       setLocations(prev => [...prev, res.data]);
       speak(`Success. ${name} has been permanently saved.`);
+      
+      // Restart listening to inject the new location name into the AI grammar
+      stopListening();
+      startListening(modelRef.current);
     } catch (err) {
       console.error("DB Save Error:", err);
       speak("Error. Could not save location to the server.");
@@ -131,7 +135,7 @@ const SavedLocations: React.FC = () => {
     const cmd = text.toLowerCase().trim();
     if (!cmd) return;
 
-    if (cmd.includes("back") || cmd.includes("exit") || cmd.includes("go home")) {
+    if (cmd.includes("back") || cmd.includes("exit") || cmd.includes("home")) {
         handleBack();
         return;
     }
@@ -153,16 +157,35 @@ const SavedLocations: React.FC = () => {
         }
         return;
     }
+
+    // Fallback: If they just say the name directly without "go to"
+    const directMatch = locationsRef.current.find(loc => cmd === loc.name.toLowerCase());
+    if (directMatch) {
+        startNavigation(directMatch);
+        return;
+    }
   };
 
-  // --- 5. VOSK AUDIO ENGINE ---
+  // --- 5. VOSK AUDIO ENGINE (DYNAMIC GRAMMAR) ---
   const startListening = async (model: any) => {
+    if (!model) return;
     try {
         const ctx = new AudioContext({ sampleRate: 16000 });
         audioContextRef.current = ctx;
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Noise suppression
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { echoCancellation: true, noiseSuppression: true } 
+        });
         const source = ctx.createMediaStreamSource(stream);
-        const recognizer = new model.KaldiRecognizer(16000);
+        
+        // 🚨 DYNAMIC GRAMMAR: Add standard commands + user's saved location names
+        const baseCommands = ["back", "exit", "home", "save current location", "save here", "go to", "navigate to", "[unk]"];
+        const locationNames = locationsRef.current.map(loc => loc.name.toLowerCase());
+        const fullGrammarArray = [...baseCommands, ...locationNames];
+        const grammar = JSON.stringify(fullGrammarArray);
+
+        const recognizer = new model.KaldiRecognizer(16000, grammar);
         
         recognizer.on("result", (msg: any) => {
             if (msg.result && msg.result.text) {
@@ -176,7 +199,8 @@ const SavedLocations: React.FC = () => {
         source.connect(node);
         node.connect(ctx.destination);
     } catch (e) { 
-        console.error(e);
+        console.error("Mic Error:", e);
+        setStatus("Mic Error");
     }
   };
 
@@ -200,7 +224,7 @@ const SavedLocations: React.FC = () => {
           <span className="action-icon">📍</span>
           Save Current
         </button>
-     
+      
         <button className="action-btn" onClick={() => setShowLinkModal(true)}>
           <span className="action-icon">🔗</span>
           Save via Link
@@ -216,7 +240,6 @@ const SavedLocations: React.FC = () => {
           locations.map((loc, index) => (
             <div key={loc.id || index} className="location-card" onClick={() => startNavigation(loc)}>
               <div className="location-name">{loc.name}</div>
-              {/* FIXED TypeScript Error: Exclusively chaining ?? instead of mixing ?? and || */}
               <div className="location-coords">
                   {(loc.lat ?? loc.latitude ?? 0).toFixed(4)}, {(loc.lng ?? loc.longitude ?? 0).toFixed(4)}
               </div>
