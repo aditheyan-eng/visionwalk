@@ -8,7 +8,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './Navigation.css';
 
-// Fix for default Leaflet marker icons not showing in React
+// Fix for default Leaflet marker icons
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -31,7 +31,7 @@ const Navigation: React.FC = () => {
   const [currentInstruction, setCurrentInstruction] = useState("Awaiting route...");
   const [aiStatus, setAiStatus] = useState("Loading AI...");
   const [isPocketMode, setIsPocketMode] = useState(false);
-  const [showMap, setShowMap] = useState(false); // Map Toggle State
+  const [showMap, setShowMap] = useState(false);
 
   // Map Data States
   const [currentLoc, setCurrentLoc] = useState<[number, number] | null>(null);
@@ -79,6 +79,13 @@ const Navigation: React.FC = () => {
     if (cmd.includes("show map")) { setShowMap(true); speak("Map view enabled."); return; }
     if (cmd.includes("hide map") || cmd.includes("show camera")) { setShowMap(false); speak("Camera view enabled."); return; }
 
+    // 🚨 ADDED "HOME" LOGIC HERE
+    if (cmd.includes("home")) {
+        speak("Returning to home screen.");
+        navigate('/home');
+        return;
+    }
+
     if (cmd.includes("back") || cmd.includes("exit")) {
         speak("Ending navigation.");
         navigate(-1);
@@ -94,9 +101,15 @@ const Navigation: React.FC = () => {
         
         const ctx = new AudioContext({ sampleRate: 16000 });
         audioContextRef.current = ctx;
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { echoCancellation: true, noiseSuppression: true } 
+        });
         const source = ctx.createMediaStreamSource(stream);
-        const recognizer = new model.KaldiRecognizer(16000);
+        
+        // 🚨 ADDED "home" to the Grammar Array
+        const grammar = '["unlock", "disable pocket mode", "pocket mode", "lock screen", "show map", "hide map", "show camera", "back", "exit", "home", "[unk]"]';
+        const recognizer = new model.KaldiRecognizer(16000, grammar);
         
         recognizer.on("result", (msg: any) => {
             if (msg.result && msg.result.text) handleCommand(msg.result.text);
@@ -184,13 +197,13 @@ const Navigation: React.FC = () => {
 
   useEffect(() => {
     if (!targetLat || !targetLng) return;
-    const TOMTOM_KEY = "vdDUOcV80JnWR7hlCRGmKKbzFMQjycmr"; // ⚠️ KEEP YOUR KEY HERE
+    const TOMTOM_KEY = "vdDUOcV80JnWR7hlCRGmKKbzFMQjycmr"; 
 
     const fetchRoute = () => {
       navigator.geolocation.getCurrentPosition(async (pos) => {
         const startLat = pos.coords.latitude;
         const startLng = pos.coords.longitude;
-        setCurrentLoc([startLat, startLng]); // Set initial map pin
+        setCurrentLoc([startLat, startLng]); 
         
         try {
           const url = `https://api.tomtom.com/routing/1/calculateRoute/${startLat},${startLng}:${targetLat},${targetLng}/json?instructionsType=text&travelMode=pedestrian&key=${TOMTOM_KEY}`;
@@ -199,8 +212,6 @@ const Navigation: React.FC = () => {
           
           if (data.routes && data.routes.length > 0) {
             const steps = data.routes[0].guidance.instructions;
-            
-            // Extract the path points to draw the blue line on the map!
             const points = data.routes[0].legs[0].points.map((p: any) => [p.latitude, p.longitude]);
             setRoutePath(points);
 
@@ -222,7 +233,7 @@ const Navigation: React.FC = () => {
       (position) => {
         const userLat = position.coords.latitude;
         const userLng = position.coords.longitude;
-        setCurrentLoc([userLat, userLng]); // Update the moving map pin!
+        setCurrentLoc([userLat, userLng]); 
         
         const nextTurn = routeSteps[currentStepIndex];
         const distanceToTurn = calculateDistance(userLat, userLng, nextTurn.point.latitude, nextTurn.point.longitude);
@@ -248,60 +259,95 @@ const Navigation: React.FC = () => {
   }, [routeSteps, currentStepIndex]);
 
   return (
-    <div className="nav-container">
+    // 🚨 NEW MOBILE-PERFECT CONTAINER: 100dvh guarantees it fits mobile screens!
+    <div style={{ width: '100vw', height: '100dvh', position: 'relative', overflow: 'hidden', backgroundColor: '#000' }}>
+      
       {isPocketMode && (
-        <div className="pocket-mode-overlay">
-          <div className="lock-icon">🔒</div>
+        <div className="pocket-mode-overlay" style={{ zIndex: 9999 }}>
+          <div className="lock-icon" style={{ fontSize: '50px' }}>🔒</div>
           <h1>Pocket Mode Active</h1>
           <p>Touch controls disabled.</p>
           <p style={{ marginTop: '20px', color: '#fff' }}>Say <strong>"Unlock"</strong> to restore screen.</p>
         </div>
       )}
 
-      {/* BACKGROUND TOGGLE: Show Map OR Show Camera */}
-      {showMap && currentLoc ? (
-        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
-            <MapContainer center={currentLoc} zoom={16} style={{ height: '100%', width: '100%' }}>
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                {routePath.length > 0 && <Polyline positions={routePath} color="#4ade80" weight={5} />}
-                <Marker position={currentLoc}>
-                    <Popup>You are here</Popup>
-                </Marker>
-            </MapContainer>
-        </div>
-      ) : (
-        <>
-            <video ref={videoRef} className="video-layer" playsInline muted />
-            <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight} className="canvas-layer" />
-        </>
-      )}
+      {/* 🚨 CAMERA LAYER: Always rendered so the AI never crashes, just hidden when map is active */}
+      <video 
+        ref={videoRef} 
+        playsInline 
+        muted 
+        style={{ 
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+          objectFit: 'cover', zIndex: 0, opacity: showMap ? 0 : 1 
+        }} 
+      />
+      <canvas 
+        ref={canvasRef} 
+        width={window.innerWidth} 
+        height={window.innerHeight} 
+        style={{ 
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+          zIndex: 1, pointerEvents: 'none', opacity: showMap ? 0 : 1 
+        }} 
+      />
 
-      {/* UI PANEL */}
-      <div className="ui-panel">
-        <div className="status-row">
-            <span className="status-ai">🤖 {aiStatus}</span>
-            <span className="status-gps">📍 {navStatus}</span>
+      {/* 🚨 MAP LAYER: Sits on top of the camera when showMap is true */}
+      <div style={{ 
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', 
+          zIndex: 2, opacity: showMap ? 1 : 0, pointerEvents: showMap ? 'auto' : 'none' 
+      }}>
+        {currentLoc && (
+          <MapContainer center={currentLoc} zoom={18} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+            {routePath.length > 0 && <Polyline positions={routePath} color="#3b82f6" weight={8} />}
+            <Marker position={currentLoc}>
+              <Popup>You are here</Popup>
+            </Marker>
+          </MapContainer>
+        )}
+      </div>
+
+      {/* 🚨 UI PANEL: Locked to the bottom of the screen, accounting for safe areas! */}
+      <div style={{ 
+        position: 'absolute', bottom: 0, left: 0, width: '100%', zIndex: 10, 
+        backgroundColor: 'rgba(15, 23, 42, 0.95)', padding: '20px', 
+        borderTopLeftRadius: '24px', borderTopRightRadius: '24px', backdropFilter: 'blur(10px)', 
+        display: 'flex', flexDirection: 'column', gap: '15px',
+        paddingBottom: 'calc(env(safe-area-inset-bottom, 20px) + 20px)' 
+      }}>
+        
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', fontWeight: 'bold' }}>
+            <span style={{ color: '#4ade80' }}>🤖 {aiStatus}</span>
+            <span style={{ color: '#60a5fa' }}>📍 {navStatus}</span>
         </div>
         
-        <h2 className="instruction-text">{currentInstruction}</h2>
+        <h2 style={{ fontSize: '22px', color: 'white', margin: 0, lineHeight: '1.3' }}>
+            {currentInstruction}
+        </h2>
 
         <div style={{ display: 'flex', gap: '10px' }}>
             <button 
-                className="nav-exit-btn"
-                style={{ flex: 1, background: 'rgba(255, 255, 255, 0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' }}
+                style={{ 
+                    flex: 1, padding: '15px', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold',
+                    background: 'rgba(255, 255, 255, 0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)',
+                    cursor: 'pointer'
+                }}
                 onClick={() => { setShowMap(!showMap); speak(showMap ? "Camera view enabled." : "Map view enabled."); }}
             >
-                {showMap ? "📷 Show Camera" : "🗺️ Show Map"}
+                {showMap ? "📷 Camera" : "🗺️ Map"}
             </button>
             <button 
-                className="nav-exit-btn"
-                style={{ flex: 1 }}
-                onClick={() => { speak("Ending navigation."); navigate(-1); }}
+                style={{ 
+                    flex: 1, padding: '15px', borderRadius: '12px', fontSize: '16px', fontWeight: 'bold',
+                    background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer'
+                }}
+                onClick={() => { speak("Ending navigation."); navigate('/home'); }}
             >
-                Exit Navigation
+                Exit
             </button>
         </div>
       </div>
+
     </div>
   );
 };

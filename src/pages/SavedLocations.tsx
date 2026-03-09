@@ -20,6 +20,7 @@ const SavedLocations: React.FC = () => {
   
   // Modal states
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [showCurrentLocModal, setShowCurrentLocModal] = useState(false);
   const [newLink, setNewLink] = useState("");
   const [newLocName, setNewLocName] = useState("");
 
@@ -88,7 +89,7 @@ const SavedLocations: React.FC = () => {
       setLocations(prev => [...prev, res.data]);
       speak(`Success. ${name} has been permanently saved.`);
       
-      // Restart listening to inject the new location name into the AI grammar
+      // Restart listening to inject the new location sentence into the AI grammar
       stopListening();
       startListening(modelRef.current);
     } catch (err) {
@@ -97,13 +98,26 @@ const SavedLocations: React.FC = () => {
     }
   };
 
-  const saveCurrentLocation = () => {
-    speak("Acquiring GPS signal to save current location.");
+  const initiateSaveCurrentLocation = () => {
+    speak("Please type or dictate a name for this location.");
+    setNewLocName("");
+    setShowCurrentLocModal(true);
+  };
+
+  const confirmSaveCurrentLocation = () => {
+    if (!newLocName.trim()) {
+      speak("Please provide a valid name.");
+      return;
+    }
+
+    speak(`Acquiring GPS signal to save ${newLocName}.`);
+    setShowCurrentLocModal(false);
+
     if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition((pos) => {
-      const defaultName = `Saved Point ${locations.length + 1}`;
-      saveToDatabase(defaultName, pos.coords.latitude, pos.coords.longitude);
+      saveToDatabase(newLocName, pos.coords.latitude, pos.coords.longitude);
+      setNewLocName("");
     }, () => {
       speak("Failed to get GPS location. Please check permissions.");
     }, { enableHighAccuracy: true });
@@ -122,7 +136,8 @@ const SavedLocations: React.FC = () => {
     speak(`Navigating to ${loc.name}. Starting guidance.`);
     const finalLat = loc.lat ?? loc.latitude;
     const finalLng = loc.lng ?? loc.longitude;
-    navigate('/navigation', { state: { targetLat: finalLat, targetLng: finalLng } });
+    // PERFECT REDIRECT: Pushes exact coordinates to the navigation screen
+    navigate('/navigation', { state: { targetLat: finalLat, targetLng: finalLng, targetName: loc.name } });
   };
 
   const handleBack = () => {
@@ -130,7 +145,7 @@ const SavedLocations: React.FC = () => {
     navigate('/home'); 
   };
 
-  // --- 4. VOICE COMMAND PROCESSOR ---
+  // --- 4. VOICE COMMAND PROCESSOR (SMART ROUTING) ---
   const handleCommand = (text: string) => {
     const cmd = text.toLowerCase().trim();
     if (!cmd) return;
@@ -141,19 +156,22 @@ const SavedLocations: React.FC = () => {
     }
 
     if (cmd.includes("save current location") || cmd.includes("save here")) {
-        saveCurrentLocation();
+        initiateSaveCurrentLocation();
         return;
     }
 
-    if (cmd.includes("go to") || cmd.includes("navigate to")) {
-        const foundLocation = locationsRef.current.find(loc => 
-            cmd.includes(loc.name.toLowerCase())
-        );
+    // 🚨 PERFECT MATCHING: Checks for exact phrases like "go to office"
+    if (cmd.startsWith("go to ") || cmd.startsWith("navigate to ")) {
+        // Strip out the command to get just the location name
+        const targetName = cmd.replace("go to ", "").replace("navigate to ", "").trim();
+        
+        // Find the exact match in the database
+        const foundLocation = locationsRef.current.find(loc => loc.name.toLowerCase() === targetName);
 
         if (foundLocation) {
             startNavigation(foundLocation);
         } else {
-            speak("I could not find that location in your saved list.");
+            speak(`I could not find ${targetName} in your saved list.`);
         }
         return;
     }
@@ -166,23 +184,27 @@ const SavedLocations: React.FC = () => {
     }
   };
 
-  // --- 5. VOSK AUDIO ENGINE (DYNAMIC GRAMMAR) ---
+  // --- 5. VOSK AUDIO ENGINE (SMART SENTENCE GRAMMAR) ---
   const startListening = async (model: any) => {
     if (!model) return;
     try {
         const ctx = new AudioContext({ sampleRate: 16000 });
         audioContextRef.current = ctx;
         
-        // Noise suppression
         const stream = await navigator.mediaDevices.getUserMedia({ 
             audio: { echoCancellation: true, noiseSuppression: true } 
         });
         const source = ctx.createMediaStreamSource(stream);
         
-        // 🚨 DYNAMIC GRAMMAR: Add standard commands + user's saved location names
-        const baseCommands = ["back", "exit", "home", "save current location", "save here", "go to", "navigate to", "[unk]"];
+        const baseCommands = ["back", "exit", "home", "save current location", "save here", "[unk]"];
         const locationNames = locationsRef.current.map(loc => loc.name.toLowerCase());
-        const fullGrammarArray = [...baseCommands, ...locationNames];
+        
+        // 🚨 PRO TRICK: Create full sentences for the AI to expect
+        const goToCommands = locationNames.map(name => `go to ${name}`);
+        const navigateCommands = locationNames.map(name => `Maps to ${name}`);
+        
+        // Inject everything into the brain
+        const fullGrammarArray = [...baseCommands, ...locationNames, ...goToCommands, ...navigateCommands];
         const grammar = JSON.stringify(fullGrammarArray);
 
         const recognizer = new model.KaldiRecognizer(16000, grammar);
@@ -220,12 +242,12 @@ const SavedLocations: React.FC = () => {
       </header>
 
       <div className="action-bar">
-        <button className="action-btn" onClick={saveCurrentLocation}>
+        <button className="action-btn" onClick={initiateSaveCurrentLocation}>
           <span className="action-icon">📍</span>
           Save Current
         </button>
       
-        <button className="action-btn" onClick={() => setShowLinkModal(true)}>
+        <button className="action-btn" onClick={() => { setNewLocName(""); setShowLinkModal(true); }}>
           <span className="action-icon">🔗</span>
           Save via Link
         </button>
@@ -248,6 +270,26 @@ const SavedLocations: React.FC = () => {
           ))
         )}
       </div>
+
+      {showCurrentLocModal && (
+        <div className="loc-modal-overlay">
+          <div className="loc-modal">
+            <h3>Name this Location</h3>
+            <p style={{color: '#94a3b8', fontSize: '14px', marginBottom: '15px'}}>
+              What do you want to call your current physical location?
+            </p>
+            <input 
+              type="text" 
+              placeholder="e.g., My House" 
+              value={newLocName} 
+              onChange={(e) => setNewLocName(e.target.value)} 
+              autoFocus
+            />
+            <button className="go-btn" onClick={confirmSaveCurrentLocation}>Save GPS Point</button>
+            <button className="back-btn" onClick={() => setShowCurrentLocModal(false)} style={{marginTop: '10px'}}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {showLinkModal && (
         <div className="loc-modal-overlay">
