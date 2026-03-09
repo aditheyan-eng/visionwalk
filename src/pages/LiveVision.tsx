@@ -206,7 +206,8 @@ const LiveVision: React.FC = () => {
 
   useEffect(() => { if (isStarted && model) detect(); }, [isStarted, model, detect]);
 
-  const processAggressiveMode = (predictions: any[], ctx: CanvasRenderingContext2D, width: number, height: number) => {
+ // FIXED: Added an underscore to _width so TypeScript ignores it!
+  const processAggressiveMode = (predictions: any[], ctx: CanvasRenderingContext2D, _width: number, height: number) => {
     let imminentObstacleName = "";
     predictions.forEach((prediction) => {
       const [x, y, w, h] = prediction.bbox;
