@@ -54,7 +54,7 @@ const Home: React.FC = () => {
     }
     loadModel();
 
-    return () => { stopListening(); }; // Cleanup on unmount
+    return () => { stopListening(); }; 
   }, [navigate]); 
 
   // --- 2. VOICE FEEDBACK HELPER ---
@@ -165,14 +165,13 @@ const Home: React.FC = () => {
         return;
     }
 
-    // Explicitly requested commands
     if (cmd.includes("start")) { 
         speak("Starting vision mode.");
         navigate('/vision'); 
         return; 
     }
 
-    if (cmd.includes("saved location") || cmd.includes("saved locations")) { 
+    if (cmd.includes("location") || cmd.includes("saved location")) { 
         speak("Opening your saved locations list.");
         navigate('/location'); 
         return; 
@@ -183,7 +182,6 @@ const Home: React.FC = () => {
         return; 
     }
 
-    // Additional helpful commands
     if (cmd.includes("settings") || cmd.includes("profile")) { 
         speak("Opening settings.");
         setIsModalOpen(true); 
@@ -208,9 +206,16 @@ const Home: React.FC = () => {
     try {
         const ctx = new AudioContext({ sampleRate: 16000 });
         audioContextRef.current = ctx;
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // 🚨 ADDED: Noise suppression and echo cancellation for better recognition
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { echoCancellation: true, noiseSuppression: true } 
+        });
         const source = ctx.createMediaStreamSource(stream);
-        const recognizer = new modelRef.current.KaldiRecognizer(16000);
+        
+        // 🚨 ADDED: Strict grammar cheat sheet so Vosk knows exactly what words to listen for!
+        const grammar = '["start", "location", "saved location", "logout", "log out", "settings", "profile", "help", "emergency", "pocket mode", "lock screen", "unlock", "disable pocket mode", "[unk]"]';
+        const recognizer = new modelRef.current.KaldiRecognizer(16000, grammar);
         
         recognizer.on("result", (msg: any) => {
             if (msg.result && msg.result.text) {
@@ -242,7 +247,6 @@ const Home: React.FC = () => {
 
   return (
     <div className="app-container">
-      {/* Background Blobs */}
       <div className="blob blob-1"></div>
       <div className="blob blob-2"></div>
 
@@ -295,7 +299,6 @@ const Home: React.FC = () => {
         </div>
       </main>
 
-      {/* GUARDIAN MODAL */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="guardian-modal">
