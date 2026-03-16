@@ -91,7 +91,7 @@ const SavedLocations: React.FC = () => {
       
       // Restart listening to inject the new location sentence into the AI grammar
       stopListening();
-      startListening(modelRef.current);
+      if (modelRef.current) startListening(modelRef.current);
     } catch (err) {
       console.error("DB Save Error:", err);
       speak("Error. Could not save location to the server.");
@@ -123,15 +123,85 @@ const SavedLocations: React.FC = () => {
     }, { enableHighAccuracy: true });
   };
 
-  const handleSaveLink = () => {
-    speak("Saving location from link.");
-    saveToDatabase(newLocName || "New Map Link", 0, 0); 
-    setShowLinkModal(false);
-    setNewLocName("");
-    setNewLink("");
+  // --- 3. HELPER: Extract GPS from Google Maps URL ---
+  const extractCoordinatesFromLink = (url: string): { lat: number, lng: number } | null => {
+    try {
+        // Pattern 1: Looks for @latitude,longitude (Standard web links)
+        const atRegex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const atMatch = url.match(atRegex);
+        if (atMatch && atMatch.length >= 3) {
+            return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+        }
+
+        // Pattern 2: Looks for !3dLatitude!4dLongitude (Places links)
+        const bangRegex = /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/;
+        const bangMatch = url.match(bangRegex);
+        if (bangMatch && bangMatch.length >= 3) {
+            return { lat: parseFloat(bangMatch[1]), lng: parseFloat(bangMatch[2]) };
+        }
+
+        // Pattern 3: Looks for search/latitude,longitude
+        const searchRegex = /search\/(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const searchMatch = url.match(searchRegex);
+        if (searchMatch && searchMatch.length >= 3) {
+            return { lat: parseFloat(searchMatch[1]), lng: parseFloat(searchMatch[2]) };
+        }
+
+        return null;
+    } catch (e) {
+        return null;
+    }
   };
 
-  // --- 3. NAVIGATION REDIRECT ---
+  const handleSaveLink = () => {
+    if (!newLink.trim()) {
+        speak("Please paste a valid link.");
+        return;
+    }
+
+    const coords = extractCoordinatesFromLink(newLink);
+
+    if (coords) {
+        speak(`Extracting exact coordinates and saving location.`);
+        saveToDatabase(newLocName || "New Map Link", coords.lat, coords.lng); 
+        setShowLinkModal(false);
+        setNewLocName("");
+        setNewLink("");
+    } else {
+        console.error("Could not parse URL:", newLink);
+        speak("Could not find exact coordinates in that link. Please copy the full link from the browser address bar.");
+        alert("Extraction failed: Please paste a FULL Google Maps link containing the '@lat,lng' format.");
+    }
+  };
+
+  // --- 4. DATABASE DELETE ACTION ---
+  const handleDeleteLocation = async (e: React.MouseEvent, id: number | undefined, name: string) => {
+    // Crucial: Stops the click from bubbling up to the card's navigation function
+    e.stopPropagation();
+
+    if (!id) {
+        speak("Error. Cannot find location ID.");
+        return;
+    }
+
+    const confirmDelete = window.confirm(`Are you sure you want to delete ${name}?`);
+    if (!confirmDelete) return;
+
+    try {
+        await axios.delete(`https://visionwalk-backend.onrender.com/api/locations/${id}`);
+        setLocations(prev => prev.filter(loc => loc.id !== id));
+        speak(`${name} has been deleted.`);
+        
+        // Restart listening so the deleted location is removed from the AI's vocabulary
+        stopListening();
+        if (modelRef.current) startListening(modelRef.current);
+    } catch (err) {
+        console.error("Failed to delete location:", err);
+        speak("Error deleting location. Please try again.");
+    }
+  };
+
+  // --- 5. NAVIGATION REDIRECT ---
   const startNavigation = (loc: SavedLocation) => {
     speak(`Navigating to ${loc.name}. Starting guidance.`);
     const finalLat = loc.lat ?? loc.latitude;
@@ -145,7 +215,7 @@ const SavedLocations: React.FC = () => {
     navigate('/home'); 
   };
 
-  // --- 4. VOICE COMMAND PROCESSOR (SMART ROUTING) ---
+  // --- 6. VOICE COMMAND PROCESSOR (SMART ROUTING) ---
   const handleCommand = (text: string) => {
     const cmd = text.toLowerCase().trim();
     if (!cmd) return;
@@ -160,7 +230,7 @@ const SavedLocations: React.FC = () => {
         return;
     }
 
-    // 🚨 PERFECT MATCHING: Checks for exact phrases like "go to office"
+    // PERFECT MATCHING: Checks for exact phrases like "go to office"
     if (cmd.startsWith("go to ") || cmd.startsWith("navigate to ")) {
         // Strip out the command to get just the location name
         const targetName = cmd.replace("go to ", "").replace("navigate to ", "").trim();
@@ -184,7 +254,7 @@ const SavedLocations: React.FC = () => {
     }
   };
 
-  // --- 5. VOSK AUDIO ENGINE (SMART SENTENCE GRAMMAR) ---
+  // --- 7. VOSK AUDIO ENGINE (SMART SENTENCE GRAMMAR) ---
   const startListening = async (model: any) => {
     if (!model) return;
     try {
@@ -199,7 +269,7 @@ const SavedLocations: React.FC = () => {
         const baseCommands = ["back", "exit", "home", "save current location", "save here", "[unk]"];
         const locationNames = locationsRef.current.map(loc => loc.name.toLowerCase());
         
-        // 🚨 PRO TRICK: Create full sentences for the AI to expect
+        // PRO TRICK: Create full sentences for the AI to expect
         const goToCommands = locationNames.map(name => `go to ${name}`);
         const navigateCommands = locationNames.map(name => `Maps to ${name}`);
         
@@ -265,7 +335,28 @@ const SavedLocations: React.FC = () => {
               <div className="location-coords">
                   {(loc.lat ?? loc.latitude ?? 0).toFixed(4)}, {(loc.lng ?? loc.longitude ?? 0).toFixed(4)}
               </div>
-              <button className="go-btn">Go Here</button>
+              
+              {/* Flex container to place Go and Delete buttons side-by-side */}
+              <div className="card-actions" style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+                  <button className="go-btn" style={{ flex: 1 }}>Go Here</button>
+                  <button 
+                      className="delete-btn" 
+                      onClick={(e) => handleDeleteLocation(e, loc.id, loc.name)}
+                      aria-label={`Delete ${loc.name}`}
+                      style={{ 
+                          flex: 1, 
+                          backgroundColor: '#ff4d4d', 
+                          color: 'white', 
+                          border: 'none', 
+                          borderRadius: '8px', 
+                          cursor: 'pointer', 
+                          fontWeight: 'bold',
+                          padding: '10px'
+                      }}
+                  >
+                      Delete
+                  </button>
+              </div>
             </div>
           ))
         )}
@@ -303,7 +394,7 @@ const SavedLocations: React.FC = () => {
             />
             <input 
               type="text" 
-              placeholder="https://maps.google.com/..." 
+              placeholder="https://www.google.com/maps/place/..." 
               value={newLink} 
               onChange={(e) => setNewLink(e.target.value)} 
             />
