@@ -27,7 +27,7 @@ const LiveVision: React.FC = () => {
   const isPocketModeRef = useRef<boolean>(false);
   const priorityObjectsRef = useRef<string[]>([]);
   
-  // 🚨 REFS FOR LOCAL AI MODELS 🚨
+  // REFS FOR LOCAL AI MODELS
   const cocoModelRef = useRef<cocoSsd.ObjectDetection | null>(null);
   const sceneModelRef = useRef<mobilenet.MobileNet | null>(null);
 
@@ -57,7 +57,7 @@ const LiveVision: React.FC = () => {
       } catch (err) { setDynamicDropdownObjects(baseObjects); }
     };
 
-    // 🚨 WAKE UP BOTH LOCAL AI BRAINS 🚨
+    // WAKE UP BOTH LOCAL AI BRAINS
     const loadModels = async () => {
       try {
         await tf.ready();
@@ -153,7 +153,7 @@ const LiveVision: React.FC = () => {
     }
   };
 
-  // 🚨 ENGINE 2: OFFLINE MOBILENET (Runs every 3 seconds) 🚨
+  // ENGINE 2: OFFLINE MOBILENET (Runs every 3 seconds)
   const startMobileNetScanner = () => {
     mobileNetIntervalRef.current = window.setInterval(async () => {
         const videoElement = webcamRef.current?.video;
@@ -179,7 +179,7 @@ const LiveVision: React.FC = () => {
     }, 3000); 
   };
 
-  // 🚨 ENGINE 3: CLOUD HUGGING FACE (Runs every 6 seconds) 🚨
+  // ENGINE 3: CLOUD HUGGING FACE (Runs every 6 seconds)
   const startHuggingFaceCloud = () => {
     huggingFaceIntervalRef.current = window.setInterval(async () => {
         if (!webcamRef.current) return;
@@ -193,8 +193,9 @@ const LiveVision: React.FC = () => {
 
             if (!hfToken) return;
 
+            // Notice the URL is now routing through your Vercel CORS proxy!
             const response = await fetch(
-                "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base",
+                "/api/huggingface",
                 { headers: { Authorization: `Bearer ${hfToken}` }, method: "POST", body: blob }
             );
             const result = await response.json();
@@ -219,15 +220,14 @@ const LiveVision: React.FC = () => {
                     smartSpeak("Approaching a crosswalk.", 6000);
                 } else {
                     updateStatus("CLOUD SCENE", caption.toUpperCase(), false);
-                    // Reads out the detailed description (e.g., "A brown wooden desk with a laptop")
                     smartSpeak(`I see: ${caption}.`, 8000); 
                 }
             }
         } catch (err) { console.error("Hugging Face API failed:", err); }
-    }, 6000); // 6 seconds to prevent API rate limits
+    }, 6000); 
   };
 
-  // 🚨 ENGINE 1: FAST COCO-SSD LOOP (Runs continuously for Bounding Boxes) 🚨
+  // ENGINE 1: FAST COCO-SSD LOOP (Runs continuously for Bounding Boxes)
   const detect = useCallback(async () => {
     const now = Date.now();
     if (now - lastDetectionTime.current < 250) {

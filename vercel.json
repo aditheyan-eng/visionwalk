@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/huggingface",
+      "destination": "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base"
+    },
+    {
       "source": "/(.*)",
       "destination": "/"
     }
