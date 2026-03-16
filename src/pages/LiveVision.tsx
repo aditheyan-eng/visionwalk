@@ -79,7 +79,7 @@ const LiveVision: React.FC = () => {
     } catch (err) {}
     
     await initVoiceControl();
-    startEnvironmentScanner(); // Starts the Cloud API loop for Walls/Stairs!
+    startEnvironmentScanner(); 
   };
 
   const releaseWakeLock = async () => {
@@ -135,7 +135,7 @@ const LiveVision: React.FC = () => {
     }
   };
 
-  // 🚨 THE CLOUD NARRATOR (For Stairs, Walls, and Everything Else)
+  // 🚨 REWRITTEN FOR HUGGING FACE BACKEND RESPONSE 🚨
   const startEnvironmentScanner = () => {
     envScanIntervalRef.current = window.setInterval(async () => {
         if (!webcamRef.current) return;
@@ -145,14 +145,19 @@ const LiveVision: React.FC = () => {
 
         try {
             const API_URL = import.meta.env.VITE_API_URL || "https://visionwalk-backend.onrender.com";
+            // Send to YOUR Spring Boot backend
             const res = await axios.post(`${API_URL}/api/vision/analyze`, { image: imageSrc });
             
             const labels: string[] = res.data.labels || []; 
             
             if (labels.length > 0) {
-                const isStairs = labels.some(l => l.includes("stair") || l.includes("step"));
-                const isWall = labels.some(l => l.includes("wall"));
-                const isCrosswalk = labels.some(l => l.includes("crosswalk") || l.includes("street"));
+                // Your backend returns the full sentence in the first array slot now
+                const caption = labels[0].toLowerCase();
+                
+                // Check the sentence for keywords
+                const isStairs = caption.includes("stair") || caption.includes("step");
+                const isWall = caption.includes("wall");
+                const isCrosswalk = caption.includes("crosswalk") || caption.includes("street");
 
                 if (isStairs) {
                     updateStatus("ENVIRONMENT: STAIRS", "Proceed with caution", true);
@@ -164,9 +169,9 @@ const LiveVision: React.FC = () => {
                     updateStatus("ENVIRONMENT: STREET", "Intersection ahead", true);
                     smartSpeak("Approaching a street or crosswalk.", 6000);
                 } else {
-                    const topObjects = labels.slice(0, 4).join(", ");
-                    updateStatus("SCENE DETECTED", topObjects.toUpperCase(), false);
-                    smartSpeak(`I see: ${topObjects}.`, 7500);
+                    // Read out the descriptive sentence!
+                    updateStatus("SCENE DETECTED", caption.toUpperCase(), false);
+                    smartSpeak(`I see: ${caption}.`, 7500);
                 }
             }
         } catch (err) {
