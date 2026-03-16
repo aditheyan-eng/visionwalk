@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import Webcam from "react-webcam";
 import * as tf from "@tensorflow/tfjs";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
+import * as mobilenet from "@tensorflow-models/mobilenet"; // 🚨 ADDED MOBILENET
 import * as vosk from "vosk-browser";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -24,10 +25,13 @@ const LiveVision: React.FC = () => {
   const wakeLockRef = useRef<any>(null);
   const isPocketModeRef = useRef<boolean>(false);
   const priorityObjectsRef = useRef<string[]>([]);
+  
+  // 🚨 REFS FOR AI MODELS (Fixes React Interval staleness)
+  const cocoModelRef = useRef<cocoSsd.ObjectDetection | null>(null);
+  const sceneModelRef = useRef<mobilenet.MobileNet | null>(null);
 
   // State
   const [isStarted, setIsStarted] = useState(false);
-  const [model, setModel] = useState<cocoSsd.ObjectDetection | null>(null);
   const [isPocketMode, setIsPocketMode] = useState(false);
   const [targetObject, setTargetObject] = useState<string>("all"); 
   const [dynamicDropdownObjects, setDynamicDropdownObjects] = useState<string[]>([]);
@@ -36,7 +40,7 @@ const LiveVision: React.FC = () => {
   const [voiceTranscript, setVoiceTranscript] = useState("Listening..."); 
   const [isDanger, setIsDanger] = useState(false);
   
-  const baseObjects = ["person", "cup", "bottle", "chair", "cell phone", "keys", "laptop", "door", "backpack"];
+  const baseObjects = ["person", "cup", "bottle", "chair", "cell phone", "keys", "laptop", "door", "backpack", "wall", "stairs"];
 
   useEffect(() => { isPocketModeRef.current = isPocketMode; }, [isPocketMode]);
 
@@ -52,10 +56,23 @@ const LiveVision: React.FC = () => {
       } catch (err) { setDynamicDropdownObjects(baseObjects); }
     };
 
+    // 🚨 WAKE UP BOTH AI BRAINS 🚨
     const loadModels = async () => {
-      await tf.ready();
-      const loadedModel = await cocoSsd.load({ base: "lite_mobilenet_v2" });
-      setModel(loadedModel);
+      try {
+        await tf.ready();
+        
+        // 1. COCO-SSD for Bounding Boxes
+        const loadedCoco = await cocoSsd.load({ base: "lite_mobilenet_v2" });
+        cocoModelRef.current = loadedCoco;
+        console.log("✅ COCO-SSD Loaded");
+
+        // 2. MobileNet for Walls & Stairs
+        const loadedScene = await mobilenet.load({ version: 2, alpha: 0.5 });
+        sceneModelRef.current = loadedScene;
+        console.log("✅ MobileNet Scanner Loaded");
+      } catch (err) {
+        console.error("Failed to load models:", err);
+      }
     };
     
     fetchAdminPriorities();
@@ -79,7 +96,7 @@ const LiveVision: React.FC = () => {
     } catch (err) {}
     
     await initVoiceControl();
-    startEnvironmentScanner(); 
+    startEnvironmentScanner(); // Starts MobileNet loop
   };
 
   const releaseWakeLock = async () => {
@@ -95,7 +112,7 @@ const LiveVision: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
       const source = audioContext.createMediaStreamSource(stream);
       
-      const grammar = '["stop", "go home", "exit", "back", "saved location", "pocket mode", "disable pocket mode", "unlock", "find", "detect", "all", "normal", "scan environment", "cup", "bottle", "keys", "phone", "chair", "person", "door", "laptop", "backpack"]';
+      const grammar = '["stop", "go home", "exit", "back", "saved location", "pocket mode", "disable pocket mode", "unlock", "find", "detect", "all", "normal", "scan environment", "cup", "bottle", "keys", "phone", "chair", "person", "door", "laptop", "backpack", "wall", "stairs"]';
       const recognizer = new loadedVoiceModel.KaldiRecognizer(16000, grammar);
 
       recognizer.on("result", (msg: any) => {
@@ -135,52 +152,35 @@ const LiveVision: React.FC = () => {
     }
   };
 
-  // 🚨 REWRITTEN FOR HUGGING FACE BACKEND RESPONSE 🚨
+  // 🚨 OFFLINE MOBILENET LOOP (Runs every 3 seconds for Walls/Stairs) 🚨
   const startEnvironmentScanner = () => {
     envScanIntervalRef.current = window.setInterval(async () => {
-        if (!webcamRef.current) return;
+        const videoElement = webcamRef.current?.video;
+        const sceneModel = sceneModelRef.current;
         
-        const imageSrc = webcamRef.current.getScreenshot();
-        if (!imageSrc) return;
+        if (!sceneModel || !videoElement || videoElement.readyState !== 4) return;
 
         try {
-            const API_URL = import.meta.env.VITE_API_URL || "https://visionwalk-backend.onrender.com";
-            // Send to YOUR Spring Boot backend
-            const res = await axios.post(`${API_URL}/api/vision/analyze`, { image: imageSrc });
+            const predictions = await sceneModel.classify(videoElement, 3);
+            const sceneDescription = predictions.map(p => p.className.toLowerCase()).join(" ");
             
-            const labels: string[] = res.data.labels || []; 
-            
-            if (labels.length > 0) {
-                // Your backend returns the full sentence in the first array slot now
-                const caption = labels[0].toLowerCase();
-                
-                // Check the sentence for keywords
-                const isStairs = caption.includes("stair") || caption.includes("step");
-                const isWall = caption.includes("wall");
-                const isCrosswalk = caption.includes("crosswalk") || caption.includes("street");
+            const isStairs = sceneDescription.includes("stair") || sceneDescription.includes("step");
+            const isWall = sceneDescription.includes("wall");
 
-                if (isStairs) {
-                    updateStatus("ENVIRONMENT: STAIRS", "Proceed with caution", true);
-                    smartSpeak("Stairs detected ahead. Please use cane.", 6000);
-                } else if (isWall) {
-                    updateStatus("ENVIRONMENT: WALL", "Path blocked", true);
-                    smartSpeak("Wall directly ahead.", 6000);
-                } else if (isCrosswalk) {
-                    updateStatus("ENVIRONMENT: STREET", "Intersection ahead", true);
-                    smartSpeak("Approaching a street or crosswalk.", 6000);
-                } else {
-                    // Read out the descriptive sentence!
-                    updateStatus("SCENE DETECTED", caption.toUpperCase(), false);
-                    smartSpeak(`I see: ${caption}.`, 7500);
-                }
+            if (isStairs) {
+                updateStatus("ENVIRONMENT: STAIRS", "Proceed with caution", true);
+                smartSpeak("Stairs detected ahead. Please use cane.", 6000);
+            } else if (isWall) {
+                updateStatus("ENVIRONMENT: WALL", "Path blocked", true);
+                smartSpeak("Wall directly ahead.", 6000);
             }
         } catch (err) {
-            console.error("Cloud Vision scan failed:", err);
+            console.error("MobileNet scan failed:", err);
         }
-    }, 4000); 
+    }, 3000); 
   };
 
-  // 🚨 FAST LOCAL DETECTION LOOP (For Exact Distance & Immediate Physical Threats)
+  // 🚨 FAST COCO-SSD LOOP (Runs at 30 FPS for Obstacles) 🚨
   const detect = useCallback(async () => {
     const now = Date.now();
     if (now - lastDetectionTime.current < 250) {
@@ -188,13 +188,15 @@ const LiveVision: React.FC = () => {
     }
     lastDetectionTime.current = now;
 
-    if (model && webcamRef.current && webcamRef.current.video?.readyState === 4) {
+    const cocoModel = cocoModelRef.current;
+    if (cocoModel && webcamRef.current && webcamRef.current.video?.readyState === 4) {
       const video = webcamRef.current.video;
       if (canvasRef.current) {
         canvasRef.current.width = video.videoWidth;
         canvasRef.current.height = video.videoHeight;
       }
-      const predictions = await model.detect(video);
+      
+      const predictions = await cocoModel.detect(video);
       const ctx = canvasRef.current?.getContext("2d");
       
       if (ctx) {
@@ -209,9 +211,12 @@ const LiveVision: React.FC = () => {
       }
     }
     requestRef.current = requestAnimationFrame(() => detect());
-  }, [model, targetObject]); 
+  }, [targetObject]); 
 
-  useEffect(() => { if (isStarted && model) detect(); }, [isStarted, model, detect]);
+  // Trigger detection loop once started
+  useEffect(() => { 
+      if (isStarted) detect(); 
+  }, [isStarted, detect]);
 
   const processAggressiveMode = (predictions: any[], ctx: CanvasRenderingContext2D, width: number, height: number) => {
     let priorityObjName = "";
@@ -223,7 +228,6 @@ const LiveVision: React.FC = () => {
     let maxDangerScore = 0;
     let maxGenericDangerScore = 0;
 
-    // Define the "Path" (Middle 50% of the screen)
     const safeZoneMin = width * 0.25;
     const safeZoneMax = width * 0.75;
     const adminList = priorityObjectsRef.current;
@@ -234,7 +238,6 @@ const LiveVision: React.FC = () => {
       const objCenterX = x + w / 2;
       const screenCoverage = h / height;
       
-      // Calculate Exact Meters Based on Screen Coverage
       let exactMeters = 0;
       if (screenCoverage > 0.8) exactMeters = 0.5;
       else if (screenCoverage > 0.6) exactMeters = 1.0;
@@ -255,7 +258,6 @@ const LiveVision: React.FC = () => {
               priorityObjMeters = exactMeters;
           }
       } else {
-          // If it's a normal object, but it's massive and right in front of us
           if (isInPath && screenCoverage > 0.5) { 
              ctx.strokeStyle = "#FFA500"; ctx.lineWidth = 4; ctx.fillStyle = "#FFA500";
              ctx.fillText(`🚧 OBSTACLE: ${text.toUpperCase()}`, x, y > 10 ? y - 5 : 10);
@@ -266,7 +268,6 @@ const LiveVision: React.FC = () => {
                  imminentObstacleMeters = exactMeters;
              }
           } else {
-             // Safe background object
              ctx.strokeStyle = "rgba(0, 255, 0, 0.5)"; ctx.lineWidth = 2; ctx.fillStyle = "rgba(0, 255, 0, 0.5)";
              ctx.fillText(text, x, y > 10 ? y - 5 : 10);
           }
@@ -274,7 +275,6 @@ const LiveVision: React.FC = () => {
       ctx.strokeRect(x, y, w, h);
     });
 
-    // Voice Engine priority logic: Local Physical Threats beat Cloud Narration
     if (priorityObjName !== "") {
       const isUrgent = maxDangerScore > 0.6; 
       updateStatus(`ALERT: ${priorityObjName.toUpperCase()}`, `${priorityObjMeters} Meters`, true);
