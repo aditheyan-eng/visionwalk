@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import Webcam from "react-webcam";
 import * as tf from "@tensorflow/tfjs";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
-import * as mobilenet from "@tensorflow-models/mobilenet"; // 🚨 ADDED MOBILENET
+import * as mobilenet from "@tensorflow-models/mobilenet";
 import * as vosk from "vosk-browser";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -13,11 +13,12 @@ const LiveVision: React.FC = () => {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  // Refs
+  // Refs for Timers & State Management
   const voskModelRef = useRef<vosk.Model | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const requestRef = useRef<number | null>(null); 
-  const envScanIntervalRef = useRef<number | null>(null);
+  const mobileNetIntervalRef = useRef<number | null>(null);
+  const huggingFaceIntervalRef = useRef<number | null>(null);
   
   const lastDetectionTime = useRef<number>(0);
   const lastSpokenTimeRef = useRef<number>(0);     
@@ -26,11 +27,11 @@ const LiveVision: React.FC = () => {
   const isPocketModeRef = useRef<boolean>(false);
   const priorityObjectsRef = useRef<string[]>([]);
   
-  // 🚨 REFS FOR AI MODELS (Fixes React Interval staleness)
+  // 🚨 REFS FOR LOCAL AI MODELS 🚨
   const cocoModelRef = useRef<cocoSsd.ObjectDetection | null>(null);
   const sceneModelRef = useRef<mobilenet.MobileNet | null>(null);
 
-  // State
+  // UI State
   const [isStarted, setIsStarted] = useState(false);
   const [isPocketMode, setIsPocketMode] = useState(false);
   const [targetObject, setTargetObject] = useState<string>("all"); 
@@ -56,22 +57,22 @@ const LiveVision: React.FC = () => {
       } catch (err) { setDynamicDropdownObjects(baseObjects); }
     };
 
-    // 🚨 WAKE UP BOTH AI BRAINS 🚨
+    // 🚨 WAKE UP BOTH LOCAL AI BRAINS 🚨
     const loadModels = async () => {
       try {
         await tf.ready();
         
-        // 1. COCO-SSD for Bounding Boxes
+        // Engine 1: COCO-SSD
         const loadedCoco = await cocoSsd.load({ base: "lite_mobilenet_v2" });
         cocoModelRef.current = loadedCoco;
-        console.log("✅ COCO-SSD Loaded");
+        console.log("✅ ENGINE 1: COCO-SSD Loaded");
 
-        // 2. MobileNet for Walls & Stairs
+        // Engine 2: MobileNet (Alpha 0.5 for mobile speed)
         const loadedScene = await mobilenet.load({ version: 2, alpha: 0.5 });
         sceneModelRef.current = loadedScene;
-        console.log("✅ MobileNet Scanner Loaded");
+        console.log("✅ ENGINE 2: MobileNet Loaded");
       } catch (err) {
-        console.error("Failed to load models:", err);
+        console.error("Failed to load local models:", err);
       }
     };
     
@@ -83,7 +84,8 @@ const LiveVision: React.FC = () => {
       releaseWakeLock();
       window.speechSynthesis.cancel();
       if (requestRef.current !== null) cancelAnimationFrame(requestRef.current);
-      if (envScanIntervalRef.current !== null) window.clearInterval(envScanIntervalRef.current);
+      if (mobileNetIntervalRef.current !== null) window.clearInterval(mobileNetIntervalRef.current);
+      if (huggingFaceIntervalRef.current !== null) window.clearInterval(huggingFaceIntervalRef.current);
     };
   }, []); 
 
@@ -96,12 +98,13 @@ const LiveVision: React.FC = () => {
     } catch (err) {}
     
     await initVoiceControl();
-    startEnvironmentScanner(); // Starts MobileNet loop
+    
+    // Start the two background loops
+    startMobileNetScanner(); 
+    startHuggingFaceCloud();
   };
 
-  const releaseWakeLock = async () => {
-    if (wakeLockRef.current) await wakeLockRef.current.release();
-  };
+  const releaseWakeLock = async () => { if (wakeLockRef.current) await wakeLockRef.current.release(); };
 
   const initVoiceControl = async () => {
     try {
@@ -126,13 +129,11 @@ const LiveVision: React.FC = () => {
       node.onaudioprocess = (e) => recognizer.acceptWaveform(e.inputBuffer);
       source.connect(node);
       node.connect(audioContext.destination);
-      speakImmediate("Vision System Ready.");
+      speakImmediate("Vision System Ready. All engines active.");
     } catch (e) { speakImmediate("Voice failed."); }
   };
 
-  const stopVoiceListener = () => {
-    if (audioContextRef.current) audioContextRef.current.close();
-  };
+  const stopVoiceListener = () => { if (audioContextRef.current) audioContextRef.current.close(); };
 
   const handleVoiceCommand = (cmd: string) => {
     if (isPocketModeRef.current && (cmd.includes("disable") || cmd.includes("unlock"))) {
@@ -152,9 +153,9 @@ const LiveVision: React.FC = () => {
     }
   };
 
-  // 🚨 OFFLINE MOBILENET LOOP (Runs every 3 seconds for Walls/Stairs) 🚨
-  const startEnvironmentScanner = () => {
-    envScanIntervalRef.current = window.setInterval(async () => {
+  // 🚨 ENGINE 2: OFFLINE MOBILENET (Runs every 3 seconds) 🚨
+  const startMobileNetScanner = () => {
+    mobileNetIntervalRef.current = window.setInterval(async () => {
         const videoElement = webcamRef.current?.video;
         const sceneModel = sceneModelRef.current;
         
@@ -174,13 +175,59 @@ const LiveVision: React.FC = () => {
                 updateStatus("ENVIRONMENT: WALL", "Path blocked", true);
                 smartSpeak("Wall directly ahead.", 6000);
             }
-        } catch (err) {
-            console.error("MobileNet scan failed:", err);
-        }
+        } catch (err) { console.error("MobileNet scan failed:", err); }
     }, 3000); 
   };
 
-  // 🚨 FAST COCO-SSD LOOP (Runs at 30 FPS for Obstacles) 🚨
+  // 🚨 ENGINE 3: CLOUD HUGGING FACE (Runs every 6 seconds) 🚨
+  const startHuggingFaceCloud = () => {
+    huggingFaceIntervalRef.current = window.setInterval(async () => {
+        if (!webcamRef.current) return;
+        const imageSrc = webcamRef.current.getScreenshot();
+        if (!imageSrc) return;
+
+        try {
+            const base64Response = await fetch(imageSrc);
+            const blob = await base64Response.blob();
+            const hfToken = import.meta.env.VITE_HF_TOKEN; 
+
+            if (!hfToken) return;
+
+            const response = await fetch(
+                "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base",
+                { headers: { Authorization: `Bearer ${hfToken}` }, method: "POST", body: blob }
+            );
+            const result = await response.json();
+            
+            if (result && result.length > 0 && result[0].generated_text) {
+                const caption = result[0].generated_text.toLowerCase();
+                console.log("Cloud AI Saw:", caption);
+
+                // If MobileNet missed it, the Cloud catches it here!
+                const isStairs = caption.includes("stair") || caption.includes("step");
+                const isWall = caption.includes("wall");
+                const isCrosswalk = caption.includes("crosswalk") || caption.includes("street");
+
+                if (isStairs) {
+                    updateStatus("ENVIRONMENT: STAIRS", "Proceed with caution", true);
+                    smartSpeak("Stairs detected ahead.", 6000);
+                } else if (isWall) {
+                    updateStatus("ENVIRONMENT: WALL", "Path blocked", true);
+                    smartSpeak("Wall directly ahead.", 6000);
+                } else if (isCrosswalk) {
+                    updateStatus("ENVIRONMENT: STREET", "Intersection ahead", true);
+                    smartSpeak("Approaching a crosswalk.", 6000);
+                } else {
+                    updateStatus("CLOUD SCENE", caption.toUpperCase(), false);
+                    // Reads out the detailed description (e.g., "A brown wooden desk with a laptop")
+                    smartSpeak(`I see: ${caption}.`, 8000); 
+                }
+            }
+        } catch (err) { console.error("Hugging Face API failed:", err); }
+    }, 6000); // 6 seconds to prevent API rate limits
+  };
+
+  // 🚨 ENGINE 1: FAST COCO-SSD LOOP (Runs continuously for Bounding Boxes) 🚨
   const detect = useCallback(async () => {
     const now = Date.now();
     if (now - lastDetectionTime.current < 250) {
@@ -213,7 +260,7 @@ const LiveVision: React.FC = () => {
     requestRef.current = requestAnimationFrame(() => detect());
   }, [targetObject]); 
 
-  // Trigger detection loop once started
+  // Trigger continuous detection loop once started
   useEffect(() => { 
       if (isStarted) detect(); 
   }, [isStarted, detect]);
